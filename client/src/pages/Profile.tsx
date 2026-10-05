@@ -1,0 +1,87 @@
+import { useState, type FormEvent } from 'react';
+import { changePassword } from '../api/auth';
+import { getErrorMessage } from '../api/client';
+import { Alert } from '../components/ui/Alert';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Field, FormActions } from '../components/ui/Field';
+import { PageHeader } from '../components/ui/PageHeader';
+import { useAuth } from '../context/AuthContext';
+
+const ROLE_LABELS = { patient: 'Patient', doctor: 'Doctor', admin: 'Administrator' } as const;
+
+export default function Profile() {
+  const { user } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!user) return null;
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSuccess('');
+    if (newPassword !== confirm) {
+      setError('New passwords do not match.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      await changePassword({ currentPassword, newPassword });
+      setSuccess('Password changed. You were logged out on your other devices.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirm('');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="page page-narrow">
+      <PageHeader title="Profile" />
+
+      <Card title="Your details">
+        <dl className="details">
+          <dt>Name</dt>
+          <dd>{user.name}</dd>
+          <dt>Email</dt>
+          <dd>{user.email}</dd>
+          <dt>Role</dt>
+          <dd>{ROLE_LABELS[user.role]}</dd>
+          {user.specialty && (
+            <>
+              <dt>Specialty</dt>
+              <dd>{user.specialty}</dd>
+            </>
+          )}
+        </dl>
+      </Card>
+
+      <Card title="Change password" onSubmit={handleSubmit}>
+        <Field label="Current password">
+          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autoComplete="current-password" />
+        </Field>
+        <Field label="New password" hint="At least 8 characters.">
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+        </Field>
+        <Field label="Confirm new password">
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
+        </Field>
+        <Alert type="error">{error}</Alert>
+        <Alert type="success">{success}</Alert>
+        <FormActions>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Change password'}
+          </Button>
+        </FormActions>
+      </Card>
+    </div>
+  );
+}

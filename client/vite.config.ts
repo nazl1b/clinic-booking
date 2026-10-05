@@ -5,8 +5,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // In development, /api requests go to the Express server.
-    // Not used yet: src/api currently returns mock data.
+    // In development, /api requests go to the Express server (server/, port 3000).
+    // src/api still returns mock data until it is switched to real fetch calls.
     proxy: {
       '/api': 'http://localhost:3000',
     },

@@ -1,9 +1,10 @@
 // Admin endpoints: /api/admin/*
 
-import type { Appointment, DeactivationResult, Doctor, Invitation, StaffAppointmentInput } from '../types';
+import type { Appointment, AppointmentQuery, DeactivationResult, Doctor, Invitation, Page, StaffAppointmentInput } from '../types';
 import { isPast } from '../utils/dates';
-import { ApiError, copy, delay } from './client';
+import { ApiError, copy, delay, toQueryString } from './client';
 import { cancelAndNotify, createStaffAppointment } from './mock/actions';
+import { listAppointments } from './mock/appointmentList';
 import { db, getSessionUserId, nextId, randomToken, setSessionUserId, type InvitationRow } from './mock/db';
 import { sendMockEmail } from './mock/emails';
 import { byDateTime, normalizeEmail, requireRole, toAppointment, toDoctor } from './mock/guards';
@@ -160,11 +161,14 @@ export async function reactivateDoctor(id: number): Promise<Doctor> {
   return copy(toDoctor(doctor));
 }
 
-// GET /api/admin/appointments?from=&to=
-export async function getAllAppointments(from: string, to: string): Promise<Appointment[]> {
+// GET /api/admin/appointments?search=&status=&kind=&from=&to=&doctor=&page=&pageSize=
+// Any doctor's appointments; returns one page and the total.
+export async function getAllAppointments(query: AppointmentQuery = {}): Promise<Page<Appointment>> {
+  const { search, status, kind, from, to, doctorId, page, pageSize } = query;
+  const qs = toQueryString({ search, status, kind, from, to, doctor: doctorId, page, pageSize });
   await delay();
   requireRole('admin');
-  return copy(db.appointments.filter((a) => a.date >= from && a.date <= to).sort(byDateTime).map(toAppointment));
+  return copy(listAppointments(new URLSearchParams(qs)));
 }
 
 // POST /api/admin/appointments — manual appointment or block for any doctor.

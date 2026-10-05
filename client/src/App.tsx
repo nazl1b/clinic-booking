@@ -12,6 +12,7 @@ import AdminAppointments from './pages/AdminAppointments';
 import AdminDoctors from './pages/AdminDoctors';
 import Availability from './pages/Availability';
 import BookSlot from './pages/BookSlot';
+import DoctorAppointments from './pages/DoctorAppointments';
 import DoctorSchedule from './pages/DoctorSchedule';
 import Doctors from './pages/Doctors';
 import ForgotPassword from './pages/ForgotPassword';
@@ -68,6 +69,7 @@ export default function App() {
 
               {/* Doctor */}
               <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
+              <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
               <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
 
               {/* Admin */}

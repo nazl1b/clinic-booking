@@ -48,6 +48,27 @@ export interface Appointment {
   createdAt: string; // ISO timestamp
 }
 
+// Search, filters and page for the doctor's and admin's appointment lists.
+// Sent as query params, e.g. ?search=maria&status=active&page=2
+export interface AppointmentQuery {
+  search?: string; // patient name, phone or email
+  status?: AppointmentStatus;
+  kind?: AppointmentKind;
+  from?: string; // "YYYY-MM-DD", inclusive
+  to?: string; // "YYYY-MM-DD", inclusive
+  doctorId?: number; // admin only
+  page?: number; // 1-based
+  pageSize?: number; // default 20, at most 100
+}
+
+// One page of a list plus the number of matching rows in total.
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface Invitation {
   id: number;
   email: string;

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { changePassword } from '../api/auth';
 import { getErrorMessage } from '../api/client';
 import { Alert } from '../components/ui/Alert';
@@ -7,17 +8,30 @@ import { Card } from '../components/ui/Card';
 import { Field, FormActions } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { ROLE_LABELS } from '../utils/roles';
 
-const ROLE_LABELS = { patient: 'Patient', doctor: 'Doctor', admin: 'Administrator' } as const;
+// "Change password" in the user menu links here: /profile#change-password
+const PASSWORD_SECTION_ID = 'change-password';
 
 export default function Profile() {
   const { user } = useAuth();
+  const location = useLocation();
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Coming from "Change password": scroll to the form and focus its first field.
+  // location.key makes it run again when the link is used while already here.
+  useEffect(() => {
+    if (location.hash !== `#${PASSWORD_SECTION_ID}`) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(PASSWORD_SECTION_ID)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    currentPasswordRef.current?.focus({ preventScroll: true });
+  }, [location.hash, location.key]);
 
   if (!user) return null;
 
@@ -44,8 +58,8 @@ export default function Profile() {
   }
 
   return (
-    <div className="page page-narrow">
-      <PageHeader title="Profile" />
+    <div className="page">
+      <PageHeader title="Profile" description="Your account details and password." />
 
       <Card title="Your details">
         <dl className="details">
@@ -64,9 +78,11 @@ export default function Profile() {
         </dl>
       </Card>
 
-      <Card title="Change password" onSubmit={handleSubmit}>
+      <Card title="Change password" id={PASSWORD_SECTION_ID} onSubmit={handleSubmit}>
         <Field label="Current password">
-          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autoComplete="current-password" />
+          <input
+            ref={currentPasswordRef}
+            type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autoComplete="current-password" />
         </Field>
         <Field label="New password" hint="At least 8 characters.">
           <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />

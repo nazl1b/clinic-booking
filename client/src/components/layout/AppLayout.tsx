@@ -1,14 +1,14 @@
-// Layout of every logged-in page: sidebar on the left, top bar with the user's
-// name and Log out, page content on the right. On small screens the sidebar is
-// hidden and opens as a drawer from the ☰ button.
+// Layout of every logged-in page: sidebar on the left, top bar with the user
+// menu (Profile, Change password, Dark mode, Log out), page content on the
+// right. On small screens the sidebar is hidden and opens as a drawer from ☰.
 
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { Role } from '../../types';
-import { Button } from '../ui/Button';
+import { ROLE_LABELS } from '../../utils/roles';
 import { Icon, type IconName } from './Icon';
-import { ThemeToggle } from './ThemeToggle';
+import { UserMenu } from './UserMenu';
 
 interface NavItem {
   to: string;
@@ -24,6 +24,7 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
   ],
   doctor: [
     { to: '/doctor/schedule', label: 'Schedule', icon: 'calendar' },
+    { to: '/doctor/appointments', label: 'Appointments', icon: 'list' },
     { to: '/doctor/availability', label: 'Working hours', icon: 'clock' },
   ],
   admin: [
@@ -31,10 +32,6 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     { to: '/admin/doctors', label: 'Doctors', icon: 'users' },
   ],
 };
-
-const ACCOUNT_ITEMS: NavItem[] = [{ to: '/profile', label: 'Profile', icon: 'user' }];
-
-const ROLE_LABELS: Record<Role, string> = { patient: 'Patient', doctor: 'Doctor', admin: 'Administrator' };
 
 export function Brand() {
   return (
@@ -50,8 +47,7 @@ export function Brand() {
 }
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Escape closes the mobile menu.
@@ -64,19 +60,6 @@ export function AppLayout() {
 
   if (!user) return null; // RequireRole around this layout handles logged-out users
 
-  async function handleLogout() {
-    await logout();
-    navigate('/login');
-  }
-
-  const renderLinks = (items: NavItem[]) =>
-    items.map((item) => (
-      <NavLink key={item.to} to={item.to} className="sidebar-link" onClick={() => setMenuOpen(false)}>
-        <Icon name={item.icon} />
-        {item.label}
-      </NavLink>
-    ));
-
   return (
     <div className={`app-shell${menuOpen ? ' menu-open' : ''}`}>
       <aside id="sidebar" className="sidebar" aria-label="Main navigation">
@@ -88,9 +71,12 @@ export function AppLayout() {
         </div>
         <nav className="sidebar-nav">
           <p className="sidebar-section">{ROLE_LABELS[user.role]}</p>
-          {renderLinks(NAV_ITEMS[user.role])}
-          <p className="sidebar-section">Account</p>
-          {renderLinks(ACCOUNT_ITEMS)}
+          {NAV_ITEMS[user.role].map((item) => (
+            <NavLink key={item.to} to={item.to} className="sidebar-link" onClick={() => setMenuOpen(false)}>
+              <Icon name={item.icon} />
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
 
@@ -113,19 +99,7 @@ export function AppLayout() {
             <Brand />
           </span>
           <div className="topbar-user">
-            <ThemeToggle />
-            <NavLink to="/profile" className="user-chip" title={user.email}>
-              <span className="avatar avatar-sm" aria-hidden="true">
-                {user.name.replace('Dr. ', '').charAt(0)}
-              </span>
-              <span className="user-chip-text">
-                <span className="user-chip-name">{user.name}</span>
-                <span className="user-chip-role">{ROLE_LABELS[user.role]}</span>
-              </span>
-            </NavLink>
-            <Button variant="tertiary" size="sm" onClick={handleLogout}>
-              Log out
-            </Button>
+            <UserMenu />
           </div>
         </header>
 

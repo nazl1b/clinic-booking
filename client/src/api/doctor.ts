@@ -1,22 +1,21 @@
 // Endpoints for the logged-in doctor: /api/doctor/*
 
-import type { Appointment, AvailabilityRule, StaffAppointmentInput } from '../types';
+import type { Appointment, AppointmentQuery, AvailabilityRule, Page, StaffAppointmentInput } from '../types';
 import { isPast, toMinutes } from '../utils/dates';
-import { ApiError, copy, delay } from './client';
+import { ApiError, copy, delay, toQueryString } from './client';
 import { cancelAndNotify, createStaffAppointment } from './mock/actions';
+import { listAppointments } from './mock/appointmentList';
 import { db, nextId } from './mock/db';
-import { byDateTime, requireRole, toAppointment } from './mock/guards';
+import { requireRole, toAppointment } from './mock/guards';
 
-// GET /api/doctor/appointments?from=&to=
-export async function getDoctorAppointments(from: string, to: string): Promise<Appointment[]> {
+// GET /api/doctor/appointments?search=&status=&kind=&from=&to=&page=&pageSize=
+// Only the logged-in doctor's appointments; returns one page and the total.
+export async function getDoctorAppointments(query: AppointmentQuery = {}): Promise<Page<Appointment>> {
+  const { search, status, kind, from, to, page, pageSize } = query; // no doctor: the server uses the logged-in one
+  const qs = toQueryString({ search, status, kind, from, to, page, pageSize });
   await delay();
   const doctor = requireRole('doctor');
-  return copy(
-    db.appointments
-      .filter((a) => a.doctorId === doctor.id && a.date >= from && a.date <= to)
-      .sort(byDateTime)
-      .map(toAppointment),
-  );
+  return copy(listAppointments(new URLSearchParams(qs), { doctorId: doctor.id }));
 }
 
 // GET /api/doctor/availability

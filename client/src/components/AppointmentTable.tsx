@@ -1,6 +1,8 @@
 // Table of appointments shared by the patient, doctor and admin pages.
-// Columns are switched on/off per page.
+// Columns are switched on/off per page. For a single day it can also list the
+// free times between the appointments, so the whole day is visible at once.
 
+import type { FreeSlot } from '../api/doctors';
 import type { Appointment } from '../types';
 import { formatDate, fromMinutes, isPast, toMinutes } from '../utils/dates';
 import { Badge, type BadgeTone } from './ui/Badge';
@@ -12,9 +14,23 @@ interface AppointmentTableProps {
   appointments: Appointment[];
   showDoctor?: boolean;
   showPatient?: boolean;
+  showDate?: boolean; // default true; off for a single-day list
   onCancel?: (appointment: Appointment) => void;
   cancellingId?: number | null;
+  freeSlots?: FreeSlot[]; // single-day list only: free times shown between the appointments
+  onAddAt?: (slot: FreeSlot) => void; // "+ Add" on a free time
   emptyText?: string;
+}
+
+type Row = { kind: 'appointment'; time: string; appointment: Appointment } | { kind: 'free'; time: string; slot: FreeSlot };
+
+function rowClass(a: Appointment, status: { label: string }): string | undefined {
+  const classes = [
+    a.status === 'cancelled' && 'row-cancelled',
+    a.status !== 'cancelled' && status.label === 'Past' && 'row-muted',
+    a.status !== 'cancelled' && a.kind === 'block' && 'row-block',
+  ].filter(Boolean);
+  return classes.length ? classes.join(' ') : undefined;
 }
 
 const KIND: Record<Appointment['kind'], { label: string; tone: BadgeTone }> = {
@@ -42,28 +58,72 @@ function patientCell(a: Appointment) {
   return <span className="muted">—</span>;
 }
 
-export function AppointmentTable({ appointments, showDoctor, showPatient, onCancel, cancellingId, emptyText }: AppointmentTableProps) {
-  if (appointments.length === 0) return <Muted>{emptyText ?? 'No appointments.'}</Muted>;
+export function AppointmentTable({
+  appointments,
+  showDoctor,
+  showPatient,
+  showDate = true,
+  onCancel,
+  cancellingId,
+  freeSlots = [],
+  onAddAt,
+  emptyText,
+}: AppointmentTableProps) {
+  if (appointments.length === 0 && freeSlots.length === 0) return <Muted>{emptyText ?? 'No appointments.'}</Muted>;
 
+  const hasActions = Boolean(onCancel || onAddAt);
   const columns: Column[] = [
-    { label: 'Date' },
+    ...(showDate ? [{ label: 'Date' }] : []),
     { label: 'Time' },
     ...(showDoctor ? [{ label: 'Doctor' }] : []),
     ...(showPatient ? [{ label: 'Patient' }] : []),
     { label: 'Type' },
     { label: 'Note' },
     { label: 'Status' },
-    ...(onCancel ? [{ label: 'Actions', align: 'right' as const, hidden: true }] : []),
+    ...(hasActions ? [{ label: 'Actions', align: 'right' as const, hidden: true }] : []),
   ];
+  // Columns a free-time row spans after the Time column.
+  const freeSpan = (showDoctor ? 1 : 0) + (showPatient ? 1 : 0) + 3;
+
+  // Free times go between the appointments, by start time. When both start at
+  // the same time (a cancelled appointment freed the slot), the appointment comes first.
+  const rows: Row[] = [
+    ...appointments.map((a): Row => ({ kind: 'appointment', time: a.time, appointment: a })),
+    ...freeSlots.map((s): Row => ({ kind: 'free', time: s.time, slot: s })),
+  ];
+  if (freeSlots.length > 0) rows.sort((x, y) => x.time.localeCompare(y.time) || (x.kind === 'appointment' ? -1 : 1));
 
   return (
     <Table columns={columns}>
-      {appointments.map((a) => {
+      {rows.map((row) => {
+        if (row.kind === 'free') {
+          const slot = row.slot;
+          return (
+            <tr key={`free-${slot.time}`} className="row-free">
+              {showDate && <td />}
+              <td className="nowrap tabular">
+                {slot.time}–{fromMinutes(toMinutes(slot.time) + slot.durationMinutes)}
+              </td>
+              <td colSpan={freeSpan}>Available</td>
+              {hasActions && (
+                <ActionsCell>
+                  {onAddAt && (
+                    <Button variant="tertiary" size="sm" onClick={() => onAddAt(slot)} aria-label={`Add an appointment at ${slot.time}`}>
+                      + Add
+                    </Button>
+                  )}
+                </ActionsCell>
+              )}
+            </tr>
+          );
+        }
+
+        const a = row.appointment;
         const status = statusOf(a);
         const canCancel = onCancel && status.label === 'Upcoming';
         return (
-          <tr key={a.id} className={a.status === 'cancelled' ? 'row-cancelled' : status.label === 'Past' ? 'row-muted' : undefined}>
-            <td className="nowrap">{formatDate(a.date)}</td>
+          <tr key={a.id} className={rowClass(a, status)}>
+            {showDate && <td className="nowrap">{formatDate(a.date)}</td>}
             <td className="nowrap tabular">
               {a.time}–{fromMinutes(toMinutes(a.time) + a.durationMinutes)}
             </td>
@@ -81,7 +141,7 @@ export function AppointmentTable({ appointments, showDoctor, showPatient, onCanc
             <td>
               <Badge tone={status.tone}>{status.label}</Badge>
             </td>
-            {onCancel && (
+            {hasActions && (
               <ActionsCell>
                 {canCancel && (
                   <Button variant="secondary" size="sm" danger disabled={cancellingId === a.id} onClick={() => onCancel(a)}>

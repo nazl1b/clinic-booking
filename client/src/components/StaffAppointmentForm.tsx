@@ -17,17 +17,19 @@ import { Segmented } from './ui/Segmented';
 interface StaffAppointmentFormProps {
   doctorId?: number; // fixed doctor (doctor's own page)
   doctors?: Doctor[]; // admin: choose any active doctor
+  initialDate?: string; // e.g. "+ Add" on a free time in the day schedule
+  initialSlot?: FreeSlot;
   onSubmit: (input: StaffAppointmentInput) => Promise<void>;
   onClose: () => void;
 }
 
 type Kind = StaffAppointmentInput['kind'];
 
-export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onClose }: StaffAppointmentFormProps) {
+export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSlot, onSubmit, onClose }: StaffAppointmentFormProps) {
   const [kind, setKind] = useState<Kind>('manual');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(doctorId ?? doctors?.[0]?.id ?? null);
-  const [date, setDate] = useState(clinicToday());
-  const [slot, setSlot] = useState<FreeSlot | null>(null);
+  const [date, setDate] = useState(initialDate ?? clinicToday());
+  const [slot, setSlot] = useState<FreeSlot | null>(initialSlot ?? null);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [blockSlots, setBlockSlots] = useState(1); // block length in slots

@@ -54,8 +54,17 @@
   --radius-sm: 6px;
   --radius-xs: 4px;
   --shadow: none;
+  --shadow-popover: 0 8px 24px rgb(16 33 28 / 12%), 0 2px 6px rgb(16 33 28 / 8%); /* dropdowns float above the page */
   --focus-ring: 0 0 0 3px rgb(31 79 67 / 22%);
+  --hatch-a: #f5f6f5;
+  --hatch-b: #ebeeec;
   --sidebar-width: 240px;
+  /* Page layout: every logged-in page uses the same width and spacing */
+  --content-max: 1280px; /* caps line length on very wide screens */
+  --content-pad-x: 28px;
+  --content-pad-top: 28px;
+  --content-pad-bottom: 48px;
+  --page-gap: 20px; /* between header, cards and grids */
   --topbar-height: 56px;
   --control-height: 38px;
 
@@ -112,8 +121,12 @@
   --sidebar-text: #a7bdb2;
   --sidebar-section: #6f897d;
 
+  --hatch-a: #161e1b;
+  --hatch-b: #1e2925;
+
   --backdrop: rgb(0 0 0 / 60%);
   --focus-ring: 0 0 0 3px rgb(143 194 173 / 30%);
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 30%);
 }
 
 * {
@@ -374,6 +387,148 @@ code {
   color: var(--text-muted);
 }
 
+/* ---- User menu (dropdown under the avatar) ---- */
+
+.user-menu {
+  position: relative;
+  min-width: 0;
+}
+.user-menu-trigger {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.user-menu.open .user-menu-trigger {
+  background: var(--surface-muted);
+}
+.user-menu-chevron {
+  display: inline-grid;
+  color: var(--text-muted);
+  transition: transform var(--ease-fast);
+}
+.user-menu.open .user-menu-chevron {
+  transform: rotate(180deg);
+}
+
+.user-menu-panel {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 248px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  animation: menu-in var(--ease-fast);
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.user-menu-header {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.3;
+}
+.user-menu-name {
+  font-weight: 600;
+}
+.user-menu-email {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.93rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.user-menu-item svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.user-menu-item:hover,
+.user-menu-item:focus-visible {
+  background: var(--surface-muted);
+}
+.user-menu-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.user-menu-separator {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--border);
+}
+
+/* On / off switch inside the Dark mode item */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color var(--ease-fast);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  transition: transform var(--ease-fast);
+}
+[aria-checked='true'] > .switch {
+  background: var(--primary);
+}
+[aria-checked='true'] > .switch::after {
+  transform: translateX(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-menu-panel {
+    animation: none;
+  }
+  .user-menu-chevron,
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}
+
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -415,8 +570,9 @@ code {
 .content {
   flex: 1;
   width: 100%;
-  max-width: 1200px;
-  padding: 28px 28px 48px;
+  max-width: calc(var(--content-max) + 2 * var(--content-pad-x));
+  margin: 0 auto; /* centred in the space next to the sidebar */
+  padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
 }
 
 .brand {
@@ -480,8 +636,11 @@ code {
   .topbar-brand {
     display: block;
   }
-  .content {
-    padding: 20px 16px 40px;
+  :root {
+    --content-pad-x: 16px;
+    --content-pad-top: 20px;
+    --content-pad-bottom: 40px;
+    --page-gap: 16px;
   }
 }
 
@@ -521,19 +680,19 @@ code {
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-.page-narrow {
-  max-width: 560px;
+  gap: var(--page-gap);
 }
 .page > .btn {
   align-self: flex-start; /* e.g. a back link above the title */
+}
+.page > .btn-tertiary {
+  margin-left: -8px; /* text lines up with the page title */
 }
 
 .page-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start; /* the title sits at the same height with or without buttons */
   justify-content: space-between;
   gap: 12px 16px;
 }
@@ -565,6 +724,9 @@ code {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+.card[id] {
+  scroll-margin-top: calc(var(--topbar-height) + var(--page-gap)); /* not hidden under the sticky top bar */
 }
 .card-danger {
   border-color: var(--danger-line);
@@ -697,23 +859,25 @@ h1.card-title {
   color: var(--danger);
 }
 
-/* Tertiary: text only, soft background on hover */
+/* Tertiary: underlined text only */
 .btn-tertiary {
   background: transparent;
   border-color: transparent;
   color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
   padding-left: 8px;
   padding-right: 8px;
 }
 .btn-tertiary:hover:not(:disabled) {
-  background: var(--primary-soft);
   color: var(--primary-hover);
+  text-decoration-thickness: 2px;
 }
 .btn-tertiary.btn-danger {
   color: var(--danger);
 }
 .btn-tertiary.btn-danger:hover:not(:disabled) {
-  background: var(--danger-soft);
   color: var(--danger-hover);
 }
 
@@ -860,6 +1024,65 @@ input[type='checkbox'] {
   width: 280px;
 }
 
+/* Search and filters above an appointment list */
+.filters {
+  gap: 10px 12px;
+}
+.filters-search {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.filters .field-inline {
+  gap: 8px;
+}
+.filters .field-label {
+  font-size: 0.87rem;
+  color: var(--text-muted);
+}
+
+/* List + its pagination; dimmed while a newer page is loading */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  transition: opacity var(--ease-fast);
+}
+.results-busy {
+  opacity: 0.55;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.pagination-info {
+  color: var(--text-muted);
+  font-size: 0.93rem;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pagination-page {
+  font-size: 0.93rem;
+  font-weight: 500;
+}
+@media (max-width: 600px) {
+  .filters > * {
+    flex: 1 1 100%;
+  }
+  .filters .field-inline input {
+    flex: 1;
+  }
+}
+
 /* ================= Alerts and badges ================= */
 
 .alert {
@@ -1003,9 +1226,124 @@ input[type='checkbox'] {
 .row-cancelled td:nth-child(2) {
   text-decoration: line-through;
 }
+/* Day schedule: free time between appointments */
+.row-free td {
+  color: var(--text-muted);
+}
+@media (hover: hover) {
+  .row-free .row-actions {
+    opacity: 0;
+    transition: opacity var(--ease-fast);
+  }
+  .row-free:hover .row-actions,
+  .row-free .row-actions:focus-within {
+    opacity: 1;
+  }
+}
+/* Blocked time: hatched, so it reads as "unavailable" at a glance */
+.row-block td,
+.table tbody tr.row-block:hover td {
+  background: repeating-linear-gradient(-45deg, var(--hatch-a) 0 6px, var(--hatch-b) 6px 12px);
+}
 .table td select,
 .table td input {
   min-width: 110px;
+}
+
+/* ================= Working hours: one line per day (accordion) ================= */
+
+.day-list {
+  margin: 0 -20px; /* rows reach the card edges, like tables */
+  border-top: 1px solid var(--border);
+}
+.day-row {
+  border-bottom: 1px solid var(--border);
+}
+.day-row-head {
+  display: grid;
+  grid-template-columns: 120px 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease-fast);
+}
+.day-row-head:hover,
+.day-row.open .day-row-head {
+  background: var(--surface-muted);
+}
+.day-row-head:focus-visible {
+  outline-offset: -2px;
+}
+.day-row-name {
+  font-weight: 600;
+}
+.day-row-summary {
+  min-width: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.day-row-chevron {
+  display: inline-grid;
+  color: var(--text-muted);
+  transition: transform var(--ease);
+}
+.day-row.open .day-row-chevron {
+  transform: rotate(180deg);
+}
+.day-row-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 20px 16px 248px; /* lines up with the summary column: 20 + 120 + 12 + 84 + 12 */
+  background: var(--surface-muted);
+  animation: fade-in var(--ease) both;
+}
+.hours-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hours-sep {
+  color: var(--text-muted);
+}
+.day-row-body .btn-tertiary {
+  margin-left: -8px; /* underlined text lines up with the inputs */
+}
+.hours-row .btn-tertiary {
+  margin-left: 0;
+}
+
+@media (max-width: 600px) {
+  .day-list {
+    margin: 0 -16px;
+  }
+  .day-row-head {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    row-gap: 2px;
+    padding: 12px 16px;
+  }
+  .day-row-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .day-row-chevron {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .day-row-body {
+    padding: 4px 16px 14px;
+  }
 }
 
 /* ================= Doctors list ================= */
@@ -1013,7 +1351,7 @@ input[type='checkbox'] {
 .doctor-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  gap: var(--page-gap);
 }
 .doctor-card {
   justify-content: space-between;
@@ -1050,6 +1388,111 @@ input[type='checkbox'] {
 }
 
 /* ================= Slot picker ================= */
+
+.week-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.week-picker-head .btn-sm {
+  min-height: 34px;
+}
+.week-picker-label {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+.day-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 10px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--ease-fast),
+    background-color var(--ease-fast),
+    color var(--ease-fast),
+    transform var(--ease);
+}
+.day-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.day-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.day-btn-weekday {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.day-btn-number {
+  font-size: 1.33rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.day-btn-free {
+  font-size: 0.8rem;
+  color: var(--success);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.day-btn-empty .day-btn-free {
+  color: var(--text-muted);
+}
+.day-btn-empty:not(.selected) .day-btn-number {
+  color: var(--text-muted);
+}
+.day-btn.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+.day-btn.selected .day-btn-weekday,
+.day-btn.selected .day-btn-free {
+  color: var(--on-primary);
+  opacity: 0.85;
+}
+.day-btn:disabled {
+  background: var(--surface-muted);
+  border-style: dashed;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .day-strip {
+    gap: 4px;
+  }
+  .day-btn {
+    padding: 8px 2px;
+  }
+  .day-btn-weekday,
+  .day-btn-free {
+    font-size: 0.7rem;
+    letter-spacing: 0;
+  }
+  .day-btn-number {
+    font-size: 1.1rem;
+  }
+}
 
 .slot-grid {
   display: grid;

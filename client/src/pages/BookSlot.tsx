@@ -69,7 +69,7 @@ export default function BookSlot() {
 
   if (booked) {
     return (
-      <div className="page page-narrow">
+      <div className="page">
         <PageHeader title="Appointment booked" />
         <Card>
           <Alert type="success">

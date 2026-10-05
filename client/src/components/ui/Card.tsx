@@ -10,10 +10,11 @@ interface CardProps {
   tone?: 'default' | 'danger';
   onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
   role?: string;
+  id?: string; // anchor, e.g. /profile#change-password
   children?: ReactNode;
 }
 
-export function Card({ title, titleLevel = 2, description, actions, tone = 'default', onSubmit, role, children }: CardProps) {
+export function Card({ title, titleLevel = 2, description, actions, tone = 'default', onSubmit, role, id, children }: CardProps) {
   const className = `card${tone === 'danger' ? ' card-danger' : ''}`;
   const header = (title || actions) && (
     <div className="card-header">
@@ -27,14 +28,14 @@ export function Card({ title, titleLevel = 2, description, actions, tone = 'defa
 
   if (onSubmit) {
     return (
-      <form className={className} onSubmit={onSubmit} role={role}>
+      <form className={className} onSubmit={onSubmit} role={role} id={id}>
         {header}
         {children}
       </form>
     );
   }
   return (
-    <section className={className} role={role}>
+    <section className={className} role={role} id={id}>
       {header}
       {children}
     </section>

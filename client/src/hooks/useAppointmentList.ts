@@ -1,0 +1,48 @@
+// Loads one page of an appointment list for the search, filters and page in
+// the URL. Shared by the doctor's and the admin's Appointments pages; they
+// pass their own endpoint (getDoctorAppointments / getAllAppointments).
+
+import { useEffect, useState } from 'react';
+import { getErrorMessage } from '../api/client';
+import type { Appointment, AppointmentQuery, Page } from '../types';
+import { toAppointmentQuery, useAppointmentFilters } from './useAppointmentFilters';
+
+// Must be a stable function (a module-level API function), not an inline arrow.
+type FetchPage = (query: AppointmentQuery) => Promise<Page<Appointment>>;
+
+export function useAppointmentList(fetchPage: FetchPage) {
+  const { filters, update, clear, isFiltered } = useAppointmentFilters();
+  const [reloadKey, setReloadKey] = useState(0);
+  // The result remembers which request it belongs to; while that differs from
+  // the current request, a newer page is on its way (the old one stays visible, dimmed).
+  const listKey = `${JSON.stringify(toAppointmentQuery(filters))}|${reloadKey}`;
+  const [list, setList] = useState<{ key: string; page: Page<Appointment> } | null>(null);
+  const [error, setError] = useState<{ key: string; message: string } | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    fetchPage(toAppointmentQuery(filters))
+      .then((result) => {
+        if (ignore) return;
+        // e.g. after a cancel emptied the last page, or an old link: go to the last page that exists
+        const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
+        if (filters.page > lastPage) update({ page: lastPage }, { replace: true });
+        else setList({ key: listKey, page: result });
+      })
+      .catch((err) => !ignore && setError({ key: listKey, message: getErrorMessage(err) }));
+    return () => {
+      ignore = true;
+    };
+  }, [fetchPage, filters, update, listKey]);
+
+  return {
+    filters,
+    update,
+    clear,
+    isFiltered,
+    page: list?.page ?? null,
+    busy: list?.key !== listKey,
+    error: error?.key === listKey ? error.message : '', // only the current request's error
+    reload: () => setReloadKey((k) => k + 1),
+  };
+}

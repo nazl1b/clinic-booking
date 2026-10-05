@@ -1,12 +1,15 @@
-// Date input + grid of free time slots for one doctor. Slots reload whenever
-// the date (or doctor) changes, without a page reload.
+// Week strip + grid of free time slots for one doctor. The strip shows the
+// seven days of the chosen date's week and how many times are free on each
+// day, so the user sees at a glance where there is room. Picking a day shows
+// its slots straight away; the week's slots reload only when the week (or
+// doctor) changes.
 
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
-import { clinicToday } from '../utils/dates';
+import { addDays, clinicToday, formatDate, formatWeekday, startOfWeek } from '../utils/dates';
 import { Alert } from './ui/Alert';
-import { Field } from './ui/Field';
+import { Button } from './ui/Button';
 import { Muted } from './ui/PageHeader';
 
 interface SlotPickerProps {
@@ -19,47 +22,88 @@ interface SlotPickerProps {
 }
 
 export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelectTime, reloadKey = 0 }: SlotPickerProps) {
+  const today = clinicToday();
+  const weekStart = startOfWeek(date);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
   // The result remembers which request it belongs to; while it does not match
-  // the current one, the slots are still loading.
-  const requestKey = `${doctorId}|${date}|${reloadKey}`;
-  const [result, setResult] = useState<{ key: string; slots: FreeSlot[]; error: string } | null>(null);
+  // the current one, the week is still loading.
+  const requestKey = `${doctorId}|${weekStart}|${reloadKey}`;
+  const [result, setResult] = useState<{ key: string; slotsByDate: Record<string, FreeSlot[]>; error: string } | null>(null);
   const loading = result?.key !== requestKey;
-  const slots = loading ? [] : result.slots;
+  const slotsByDate = loading ? {} : result.slotsByDate;
   const error = loading ? '' : result.error;
+  const slots = slotsByDate[date] ?? [];
 
   useEffect(() => {
     let ignore = false;
-    getDoctorSlots(doctorId, date)
-      .then((found) => !ignore && setResult({ key: requestKey, slots: found, error: '' }))
-      .catch((err) => !ignore && setResult({ key: requestKey, slots: [], error: getErrorMessage(err) }));
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    // Past days can have no free times, so they are not requested.
+    Promise.all(weekDays.map((d) => (d < clinicToday() ? Promise.resolve([]) : getDoctorSlots(doctorId, d))))
+      .then((lists) => !ignore && setResult({ key: requestKey, slotsByDate: Object.fromEntries(weekDays.map((d, i) => [d, lists[i]])), error: '' }))
+      .catch((err) => !ignore && setResult({ key: requestKey, slotsByDate: {}, error: getErrorMessage(err) }));
     return () => {
       ignore = true;
     };
-  }, [doctorId, date, requestKey]);
+  }, [doctorId, weekStart, requestKey]);
+
+  function pickDay(day: string) {
+    if (day === date) return;
+    onDateChange(day);
+    onSelectTime(null);
+  }
+
+  // Moving to another week selects its first day that is not in the past.
+  function moveWeek(weeks: number) {
+    const start = addDays(weekStart, weeks * 7);
+    pickDay(start < today ? today : start);
+  }
 
   return (
     <div className="stack-sm">
-      <Field label="Date" inline>
-        <input
-          type="date"
-          value={date}
-          min={clinicToday()}
-          required
-          onChange={(e) => {
-            if (!e.target.value) return;
-            onDateChange(e.target.value);
-            onSelectTime(null);
-          }}
-        />
-      </Field>
+      <div className="week-picker-head">
+        <Button variant="secondary" size="sm" onClick={() => moveWeek(-1)} disabled={weekStart <= today} aria-label="Previous week">
+          ‹
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => moveWeek(1)} aria-label="Next week">
+          ›
+        </Button>
+        <strong className="week-picker-label">
+          {formatDate(weekStart)} – {formatDate(addDays(weekStart, 6))}
+        </strong>
+      </div>
+
+      <div className="day-strip" role="group" aria-label="Day">
+        {days.map((day) => {
+          const past = day < today;
+          const count = slotsByDate[day]?.length ?? 0;
+          const status = past ? '—' : loading ? '…' : count > 0 ? `${count} free` : 'No times';
+          const classes = ['day-btn', day === date && 'selected', !past && !loading && count === 0 && 'day-btn-empty'].filter(Boolean).join(' ');
+          return (
+            <button
+              key={day}
+              type="button"
+              className={classes}
+              disabled={past}
+              aria-pressed={day === date}
+              aria-label={`${formatDate(day)}, ${status === '—' ? 'past' : status}`}
+              onClick={() => pickDay(day)}
+            >
+              <span className="day-btn-weekday">{day === today ? 'Today' : formatWeekday(day)}</span>
+              <span className="day-btn-number">{Number(day.slice(8, 10))}</span>
+              <span className="day-btn-free">{status}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <Alert type="error">{error}</Alert>
       {loading ? (
         <Muted>Loading free times…</Muted>
       ) : slots.length === 0 ? (
-        !error && <Muted>No free times on this day. Try another date.</Muted>
+        !error && <Muted>No free times on {formatDate(date)}. Try another day.</Muted>
       ) : (
-        <div className="slot-grid" role="listbox" aria-label="Free times">
+        <div className="slot-grid" role="listbox" aria-label={`Free times on ${formatDate(date)}`}>
           {slots.map((slot) => (
             <button
               key={slot.time}

@@ -76,6 +76,11 @@ export function formatDate(date: string): string {
   }).format(toUtcDate(date));
 }
 
+// "Mon"
+export function formatWeekday(date: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(toUtcDate(date));
+}
+
 // "6 Oct 2026, 14:05" in clinic time, for ISO timestamps.
 export function formatTimestamp(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -87,15 +92,6 @@ export function formatTimestamp(iso: string): string {
     minute: '2-digit',
     hourCycle: 'h23',
   }).format(new Date(iso));
-}
-
-export type RangeMode = 'day' | 'week';
-
-// The day itself, or Monday–Sunday of its week.
-export function rangeFor(mode: RangeMode, anchor: string): { from: string; to: string } {
-  if (mode === 'day') return { from: anchor, to: anchor };
-  const from = startOfWeek(anchor);
-  return { from, to: addDays(from, 6) };
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

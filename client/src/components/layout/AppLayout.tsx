@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import type { Role } from '../../types';
 import { Button } from '../ui/Button';
 import { Icon, type IconName } from './Icon';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavItem {
   to: string;
@@ -112,6 +113,7 @@ export function AppLayout() {
             <Brand />
           </span>
           <div className="topbar-user">
+            <ThemeToggle />
             <NavLink to="/profile" className="user-chip" title={user.email}>
               <span className="avatar avatar-sm" aria-hidden="true">
                 {user.name.replace('Dr. ', '').charAt(0)}

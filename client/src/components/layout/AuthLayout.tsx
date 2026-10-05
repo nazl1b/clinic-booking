@@ -3,10 +3,14 @@
 
 import { Link, Outlet } from 'react-router-dom';
 import { Brand } from './AppLayout';
+import { ThemeToggle } from './ThemeToggle';
 
 export function AuthLayout() {
   return (
     <div className="auth-shell">
+      <div className="auth-theme">
+        <ThemeToggle />
+      </div>
       <Link to="/" className="auth-brand">
         <Brand />
       </Link>

@@ -1,4 +1,7 @@
 import express, { type ErrorRequestHandler } from 'express'
+import { loadUser } from './middleware/auth.js'
+import { authRouter } from './routes/auth.js'
+import { sessionMiddleware } from './session.js'
 
 export const app = express()
 
@@ -12,6 +15,11 @@ app.use(express.json())
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
+
+// Every other /api route knows who is logged in (req.user), if anyone.
+app.use('/api', sessionMiddleware, loadUser)
+
+app.use('/api/auth', authRouter)
 
 // Any /api route not matched above
 app.use('/api', (_req, res) => {

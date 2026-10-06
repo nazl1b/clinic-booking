@@ -4,11 +4,9 @@
 // Safe to run more than once: existing users are left as they are, and demo
 // working hours / appointments are only added when they are missing.
 import '../src/env.js'
-import bcrypt from 'bcrypt'
+import { hashPassword } from '../src/services/passwords.js'
 import { prisma } from '../src/db.js'
 import type { AppointmentKind, AppointmentStatus, Role } from '../src/generated/prisma/client.js'
-
-const BCRYPT_ROUNDS = 12
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -59,7 +57,7 @@ async function upsertUser(user: { name: string; email: string; role: Role; speci
       role: user.role,
       specialty: user.specialty ?? null,
       isActive: user.isActive ?? true,
-      passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS),
+      passwordHash: await hashPassword(password),
     },
   })
 }

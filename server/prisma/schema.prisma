@@ -1,0 +1,141 @@
+// Database schema (ARCHITECTURE.md section 6).
+// Tables and columns are snake_case in the database, camelCase in TypeScript.
+// CHECK constraints cannot be expressed here: they live in the SQL of the migrations.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  patient
+  doctor
+  admin
+
+  @@map("role")
+}
+
+enum AppointmentKind {
+  online // booked by a patient with an account
+  manual // phone booking entered by a doctor or admin
+  block // blocked time, no patient
+
+  @@map("appointment_kind")
+}
+
+enum AppointmentStatus {
+  active
+  cancelled
+
+  @@map("appointment_status")
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  name         String
+  email        String  @unique // always lowercase
+  passwordHash String  @map("password_hash")
+  role         Role
+  specialty    String? // doctors only
+  isActive     Boolean @default(true) @map("is_active")
+
+  availability        Availability[]
+  doctorAppointments  Appointment[]   @relation("DoctorAppointments")
+  patientAppointments Appointment[]   @relation("PatientAppointments")
+  createdAppointments Appointment[]   @relation("AppointmentCreator")
+  sentInvitations     Invitation[]
+  passwordResets      PasswordReset[]
+
+  @@map("users")
+}
+
+model Invitation {
+  id        Int       @id @default(autoincrement())
+  email     String
+  name      String
+  specialty String
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  invitedBy Int       @map("invited_by")
+
+  inviter User @relation(fields: [invitedBy], references: [id])
+
+  @@index([email])
+  @@map("invitations")
+}
+
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+// One weekly working window. A day may have several; a day without rows is closed.
+model Availability {
+  id          Int      @id @default(autoincrement())
+  doctorId    Int      @map("doctor_id")
+  dayOfWeek   Int      @map("day_of_week") // 0 = Sunday … 6 = Saturday
+  startTime   DateTime @map("start_time") @db.Time(0)
+  endTime     DateTime @map("end_time") @db.Time(0)
+  slotMinutes Int      @map("slot_minutes") // same for every window of the same day (checked by the server)
+
+  doctor User @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId])
+  @@map("availability")
+}
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  doctorId        Int               @map("doctor_id")
+  kind            AppointmentKind
+  patientId       Int?              @map("patient_id") // online only
+  guestName       String?           @map("guest_name") // manual only
+  guestPhone      String?           @map("guest_phone") // manual only
+  note            String?
+  createdBy       Int               @map("created_by")
+  date            DateTime          @db.Date
+  time            DateTime          @db.Time(0)
+  durationMinutes Int               @map("duration_minutes")
+  status          AppointmentStatus @default(active)
+  reminderSent    Boolean           @default(false) @map("reminder_sent")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  doctor  User  @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patient User? @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Restrict)
+  creator User  @relation("AppointmentCreator", fields: [createdBy], references: [id])
+
+  // Two active appointments can never share a start time, even with simultaneous requests.
+  // Cancelled appointments do not hold the slot.
+  @@unique([doctorId, date, time], map: "one_active_per_slot", where: raw("status = 'active'"))
+  @@index([doctorId, date])
+  @@index([patientId])
+  @@index([date])
+  @@map("appointments")
+}
+
+// Logged-in sessions, used by connect-pg-simple. Defined here so that migrations
+// create it; otherwise Prisma would see an unknown table and want to reset the database.
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}

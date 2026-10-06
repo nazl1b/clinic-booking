@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Prisma Client, generated from server/prisma/schema.prisma (npm run db:generate)
+server/src/generated/

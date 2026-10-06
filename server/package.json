@@ -8,16 +8,26 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "bcrypt": "6.0.0",
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/bcrypt": "6.0.0",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.1",
+    "prisma": "7.10.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2"
   }

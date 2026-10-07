@@ -4,8 +4,9 @@ import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
 import { Prisma } from '../generated/prisma/client.js'
 import { bookingSchema } from '../schemas/appointments.js'
-import { parse } from '../schemas/validate.js'
+import { parse, parseId } from '../schemas/validate.js'
 import { appointmentInclude, toAppointmentJson } from '../serializers.js'
+import { upcomingWhere } from '../services/appointments.js'
 import { findSlot, lockDoctorDay } from '../services/slots.js'
 import { dateToDb, timeToDb } from '../utils/dates.js'
 
@@ -51,4 +52,40 @@ export const bookAppointment: RequestHandler = async (req, res) => {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') throw new HttpError(409, SLOT_TAKEN)
     throw err
   }
+}
+
+// GET /api/appointments/mine — every appointment of the patient (upcoming, past and
+// cancelled) by date and time; the page splits them into upcoming and history.
+export const getMyAppointments: RequestHandler = async (req, res) => {
+  const appointments = await prisma.appointment.findMany({
+    where: { patientId: req.user!.id },
+    orderBy: [{ date: 'asc' }, { time: 'asc' }],
+    include: appointmentInclude,
+  })
+  res.json(appointments.map(toAppointmentJson))
+}
+
+const APPOINTMENT_NOT_FOUND = 'Appointment not found.'
+
+// PATCH /api/appointments/:id/cancel — only the patient's own, active, upcoming appointments.
+// Checked and cancelled in one statement, so nothing can change in between.
+// Another patient's appointment is a 404, like one that does not exist.
+export const cancelMyAppointment: RequestHandler = async (req, res) => {
+  const id = parseId(req.params.id, APPOINTMENT_NOT_FOUND)
+  const patientId = req.user!.id
+
+  const { count } = await prisma.appointment.updateMany({
+    where: { id, patientId, status: 'active', ...upcomingWhere() },
+    data: { status: 'cancelled' },
+  })
+  if (count === 1) {
+    res.status(204).end()
+    return
+  }
+
+  // Nothing was cancelled: find out why.
+  const appointment = await prisma.appointment.findFirst({ where: { id, patientId } })
+  if (!appointment) throw new HttpError(404, APPOINTMENT_NOT_FOUND)
+  if (appointment.status !== 'active') throw new HttpError(400, 'This appointment is already cancelled.')
+  throw new HttpError(400, 'Past appointments cannot be cancelled.')
 }

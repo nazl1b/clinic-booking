@@ -3,16 +3,9 @@ import type { RequestHandler } from 'express'
 import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
 import { dateSchema } from '../schemas/common.js'
-import { parse } from '../schemas/validate.js'
+import { parse, parseId } from '../schemas/validate.js'
 import { toDoctorJson } from '../serializers.js'
 import { freeSlots } from '../services/slots.js'
-
-// "12" → 12; anything that is not a positive whole number → 404
-export function parseId(value: unknown, notFoundMessage: string): number {
-  const id = Number(value)
-  if (!Number.isSafeInteger(id) || id <= 0) throw new HttpError(404, notFoundMessage)
-  return id
-}
 
 // GET /api/doctors — patients; active doctors only.
 export const listDoctors: RequestHandler = async (_req, res) => {

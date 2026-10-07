@@ -39,11 +39,14 @@ export async function saveMyAvailability(rules: AvailabilityRule[]): Promise<voi
     if (toMinutes(rule.startTime) >= toMinutes(rule.endTime)) throw new ApiError(400, 'Start time must be before end time.');
     if (rule.slotMinutes < 5 || rule.slotMinutes > 240) throw new ApiError(400, 'Slot length must be between 5 and 240 minutes.');
   }
-  // Windows on the same day must not overlap.
+  // Windows on the same day must not overlap and share one appointment length.
   for (const a of rules) {
     for (const b of rules) {
       if (a !== b && a.dayOfWeek === b.dayOfWeek && a.startTime < b.endTime && b.startTime < a.endTime) {
         throw new ApiError(400, 'Working hours on the same day overlap.');
+      }
+      if (a.dayOfWeek === b.dayOfWeek && a.slotMinutes !== b.slotMinutes) {
+        throw new ApiError(400, 'All working hours on the same day must use the same appointment length.');
       }
     }
   }

@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from 'express'
 import { loadUser } from './middleware/auth.js'
 import { authRouter } from './routes/auth.js'
+import { doctorRouter } from './routes/doctor.js'
 import { sessionMiddleware } from './session.js'
 
 export const app = express()
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', sessionMiddleware, loadUser)
 
 app.use('/api/auth', authRouter)
+app.use('/api/doctor', doctorRouter)
 
 // Any /api route not matched above
 app.use('/api', (_req, res) => {

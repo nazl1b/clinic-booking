@@ -1,5 +1,6 @@
 // Weekly working hours of the logged-in doctor. Several windows per day are
-// allowed (e.g. 09:00–13:00 and 17:00–20:00).
+// allowed (e.g. 09:00–13:00 and 17:00–20:00), all with the same appointment
+// length (the server refuses different lengths on one day).
 // Each day is one collapsed line with a summary; clicking it opens the day
 // (accordion) to edit its hours. All days are saved together.
 
@@ -30,8 +31,7 @@ function sortRules(rules: AvailabilityRule[]): AvailabilityRule[] {
 function daySummary(rules: AvailabilityRule[]): string {
   const sorted = [...rules].sort((a, b) => a.startTime.localeCompare(b.startTime));
   const hours = sorted.map((r) => `${r.startTime || '--:--'}–${r.endTime || '--:--'}`).join(', ');
-  const lengths = [...new Set(sorted.map((r) => r.slotMinutes))].sort((a, b) => a - b);
-  return `${hours} · ${lengths.join(', ')} min`;
+  return `${hours} · ${sorted[0].slotMinutes} min`;
 }
 
 // New hours for a day: after the day's last window if it has one, else a morning.
@@ -68,6 +68,12 @@ export default function Availability() {
 
   function updateRule(index: number, changes: Partial<AvailabilityRule>) {
     setRules((current) => current && current.map((rule, i) => (i === index ? { ...rule, ...changes } : rule)));
+    setSuccess('');
+  }
+
+  // One appointment length per day: changing it changes every window of the day.
+  function setDaySlotMinutes(day: number, slotMinutes: number) {
+    setRules((current) => current && current.map((rule) => (rule.dayOfWeek === day ? { ...rule, slotMinutes } : rule)));
     setSuccess('');
   }
 
@@ -135,6 +141,18 @@ export default function Availability() {
 
                   {isOpen && (
                     <div id={bodyId} className="day-row-body">
+                      {working && (
+                        <label className="hours-row">
+                          <span className="field-label">Appointment length</span>
+                          <select value={entries[0].rule.slotMinutes} onChange={(e) => setDaySlotMinutes(day, Number(e.target.value))}>
+                            {SLOT_OPTIONS.map((m) => (
+                              <option key={m} value={m}>
+                                {m} min
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       {working ? (
                         entries.map(({ rule, index }) => (
                           <div key={index} className="hours-row">
@@ -157,17 +175,6 @@ export default function Availability() {
                               onChange={(e) => updateRule(index, { endTime: e.target.value })}
                               aria-label={`${DAY_NAMES[day]} to`}
                             />
-                            <select
-                              value={rule.slotMinutes}
-                              onChange={(e) => updateRule(index, { slotMinutes: Number(e.target.value) })}
-                              aria-label={`${DAY_NAMES[day]} appointment length`}
-                            >
-                              {SLOT_OPTIONS.map((m) => (
-                                <option key={m} value={m}>
-                                  {m} min appointments
-                                </option>
-                              ))}
-                            </select>
                             <Button variant="tertiary" size="sm" danger onClick={() => removeRule(index)}>
                               Remove
                             </Button>

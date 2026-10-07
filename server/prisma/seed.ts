@@ -6,6 +6,7 @@
 import '../src/env.js'
 import { hashPassword } from '../src/services/passwords.js'
 import { prisma } from '../src/db.js'
+import { dateToDb, timeToDb } from '../src/utils/dates.js'
 import type { AppointmentKind, AppointmentStatus, Role } from '../src/generated/prisma/client.js'
 
 function requireEnv(name: string): string {
@@ -39,10 +40,6 @@ function nextWeekday(day: number, weeksAhead = 0): string {
   while (dayOfWeek(date) !== day) date = addDays(date, 1)
   return addDays(date, weeksAhead * 7)
 }
-
-// Prisma maps DATE and TIME columns to Date objects in UTC.
-const dateValue = (date: string) => new Date(`${date}T00:00:00Z`)
-const timeValue = (time: string) => new Date(`1970-01-01T${time}:00Z`)
 
 // ---------- Users ----------
 
@@ -111,8 +108,8 @@ async function seedDemo(password: string) {
         .map(([, dayOfWeek, start, end, slotMinutes]) => ({
           doctorId,
           dayOfWeek,
-          startTime: timeValue(start),
-          endTime: timeValue(end),
+          startTime: timeToDb(start),
+          endTime: timeToDb(end),
           slotMinutes,
         })),
     })
@@ -200,7 +197,7 @@ async function seedDemo(password: string) {
   }
 
   await prisma.appointment.createMany({
-    data: rows.map((row) => ({ ...row, date: dateValue(row.date), time: timeValue(row.time) })),
+    data: rows.map((row) => ({ ...row, date: dateToDb(row.date), time: timeToDb(row.time) })),
   })
   console.log(`Demo data: 3 doctors, ${patients.length} patients, ${rows.length} appointments`)
 }

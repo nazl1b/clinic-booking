@@ -1,0 +1,49 @@
+# Render Blueprint: one free web service in Frankfurt that runs the Express API
+# and serves the built React app (ARCHITECTURE.md sections 4 and 14).
+# Secrets are never written here: `sync: false` makes Render ask for them when the
+# Blueprint is created, and `generateValue` lets Render create a random one.
+services:
+  - type: web
+    name: clinic-booking
+    runtime: node
+    region: frankfurt
+    plan: free
+    # The free plan has no pre-deploy command, so the build also applies the
+    # migrations to the production database and runs the seed (it only adds what
+    # is missing). --include=dev: NODE_ENV=production would otherwise skip
+    # TypeScript, Vite and the Prisma CLI, which the build needs.
+    buildCommand: >-
+      cd client && npm ci --include=dev && npm run build &&
+      cd ../server && npm ci --include=dev && npm run build &&
+      npx prisma migrate deploy && npx prisma db seed
+    startCommand: cd server && node dist/server.js
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production # secure session cookie, Express serves the React app
+      - key: CLINIC_TIMEZONE
+        value: Europe/Athens
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true # copy it from the dashboard into cron-job.org
+      # Neon branch `production`: pooled (-pooler) for the app, direct for migrations
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: APP_URL
+        sync: false # e.g. https://clinic-booking.onrender.com, for the links in emails
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false # the sender address verified in Brevo
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SEED_DEMO_PASSWORD
+        sync: false # password of the demo doctors and patients shown in the README

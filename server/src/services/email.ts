@@ -2,7 +2,8 @@
 // EMAIL_PROVIDER picks the service:
 //   ethereal (default): fake inbox for development, nothing reaches anyone.
 //                       Each email's preview link is printed to the console.
-//   brevo:              real emails through Brevo's HTTP API (Render blocks SMTP).
+//   brevo:              real emails through Brevo's HTTP API (Render blocks SMTP),
+//                       except to reserved demo addresses (see isReservedAddress).
 // sendEmail throws if sending fails; each caller decides whether that fails the request.
 import type { Transporter } from 'nodemailer'
 
@@ -24,9 +25,24 @@ if (provider === 'brevo' && (!process.env.BREVO_API_KEY || !process.env.EMAIL_FR
 }
 const senderEmail = process.env.EMAIL_FROM || 'no-reply@clinic.test'
 
+// Addresses that can never receive mail (RFC 2606 / 6761), e.g. the demo accounts
+// john@example.com or maria@clinic.test. Sent through Brevo they would bounce and
+// hurt the sender's reputation, so they are only logged.
+function isReservedAddress(address: string): boolean {
+  const domain = address.slice(address.lastIndexOf('@') + 1).toLowerCase()
+  return /\.(test|example|invalid|localhost)$/.test(domain) || /(^|\.)example\.(com|net|org)$/.test(domain)
+}
+
 export async function sendEmail(email: Email): Promise<void> {
-  if (provider === 'brevo') await sendWithBrevo(email)
-  else await sendWithEthereal(email)
+  if (provider === 'brevo') {
+    if (isReservedAddress(email.to)) {
+      console.log(`[email] Not sent to a demo address: "${email.subject}" to ${email.to}`)
+      return
+    }
+    await sendWithBrevo(email)
+  } else {
+    await sendWithEthereal(email)
+  }
 }
 
 // ---------- Brevo ----------

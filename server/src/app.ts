@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import { HttpError } from './errors.js'
 import { loadUser } from './middleware/auth.js'
@@ -40,6 +43,22 @@ app.use('/api/admin', adminRouter)
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
+
+// Online, Express also serves the built React app (client/dist): page and API share
+// one domain, so the session cookie works without CORS (ARCHITECTURE.md section 4).
+// In development Vite serves the client instead.
+const clientDist = fileURLToPath(new URL('../../client/dist/', import.meta.url))
+if (process.env.NODE_ENV === 'production') {
+  if (!existsSync(join(clientDist, 'index.html'))) console.warn(`The client is not built: ${clientDist} has no index.html`)
+  // Built files carry a content hash in their name, so they can be cached for a year.
+  app.use('/assets', express.static(join(clientDist, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }))
+  app.use(express.static(clientDist, { index: false }))
+  // Any other path is a page of the React app (React Router): always the latest index.html.
+  app.get('/{*path}', (_req, res) => {
+    res.set('Cache-Control', 'no-cache')
+    res.sendFile(join(clientDist, 'index.html'))
+  })
+}
 
 // Client errors (e.g. invalid JSON body) keep their 4xx status, and an HttpError
 // keeps its status and message (e.g. 502 when an email could not be sent).

@@ -1,9 +1,9 @@
 // Shared helpers for the API layer.
 //
 // Every function in src/api is async and either resolves with data or throws an
-// ApiError with an HTTP status, exactly like the real fetch-based client will.
-// While the backend does not exist, the functions read and write the in-memory
-// mock database in src/api/mock instead of calling fetch('/api/...').
+// ApiError with an HTTP status. They call the Express API under /api: in
+// development through Vite's proxy (vite.config.ts), online on the same domain,
+// so the session cookie is sent with every request.
 
 export class ApiError extends Error {
   status: number;
@@ -20,11 +20,6 @@ export function getErrorMessage(error: unknown): string {
   return 'Something went wrong. Please try again.';
 }
 
-// Simulated network latency so loading states are visible.
-export function delay(ms = 300): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // Query string for a GET request; empty values are left out.
 // toQueryString({ status: 'active', page: 2 }) → "status=active&page=2"
 export function toQueryString(query: object): string {
@@ -35,7 +30,46 @@ export function toQueryString(query: object): string {
   return params.toString();
 }
 
-// Returns a copy so pages can never mutate the mock database by accident.
-export function copy<T>(value: T): T {
-  return structuredClone(value);
+// Called when a request is refused with 401 while the app thinks someone is
+// logged in (e.g. a deactivated doctor, or a password changed on another device).
+// AuthContext registers itself here to clear the user and show the login page.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
+interface RequestOptions {
+  body?: unknown;
+  // Login and /me answer 401 as part of their normal work: no automatic logout.
+  ignoreUnauthorized?: boolean;
+}
+
+// fetch('/api' + path) with a JSON body; returns the JSON answer (undefined for 204).
+// The server answers errors as { error: message }.
+const UNREACHABLE = 'Could not reach the server. Please check your connection and try again.';
+
+export async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      credentials: 'same-origin',
+      headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ApiError(0, UNREACHABLE);
+  }
+
+  const data: unknown = res.status === 204 ? undefined : await res.json().catch(() => undefined);
+  if (res.ok) return data as T;
+
+  if (res.status === 401 && !options.ignoreUnauthorized) onUnauthorized?.();
+  const message = (data as { error?: unknown } | undefined)?.error;
+  if (typeof message === 'string') throw new ApiError(res.status, message);
+  // No answer from Express itself: a proxy in front of it answered instead
+  // (Vite in development while the server is stopped, Render while it starts up).
+  if (res.status === 502 || res.status === 503 || res.status === 504) throw new ApiError(res.status, UNREACHABLE);
+  throw new ApiError(res.status, 'Something went wrong. Please try again.');
 }

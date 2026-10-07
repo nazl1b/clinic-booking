@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authApi from '../api/auth';
+import { setUnauthorizedHandler } from '../api/client';
 import type { Role, User } from '../types';
 
 interface AuthContextValue {
@@ -11,7 +12,6 @@ interface AuthContextValue {
   register: (name: string, email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
-  devLoginAs: (role: Role | null) => Promise<void>; // development only
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,7 +28,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authApi
       .getMe()
       .then(setUser)
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
+  }, []);
+
+  // The server refused a request with 401: the session is gone (e.g. the doctor was
+  // deactivated, or the password was changed on another device). Forget the user,
+  // so RequireRole sends them to the login page.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -50,14 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       },
       refresh,
-      async devLoginAs(role) {
-        if (role === null) {
-          await authApi.logout();
-          setUser(null);
-        } else {
-          setUser(await authApi.devLoginAs(role));
-        }
-      },
     }),
     [user, loading, refresh],
   );

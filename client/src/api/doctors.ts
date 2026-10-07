@@ -1,18 +1,16 @@
-// Doctor directory for patients: /api/doctors
+// Doctor directory and free slots: /api/doctors
 
 import type { Doctor } from '../types';
-import { ApiError, copy, delay } from './client';
-import { db } from './mock/db';
-import { requireLogin, requireRole, toDoctor } from './mock/guards';
-import { computeFreeSlots, type FreeSlot } from './mock/slots';
+import { request } from './client';
 
-export type { FreeSlot };
+export interface FreeSlot {
+  time: string; // "HH:MM", clinic time
+  durationMinutes: number;
+}
 
-// GET /api/doctors — active doctors only.
-export async function getDoctors(): Promise<Doctor[]> {
-  await delay();
-  requireRole('patient');
-  return copy(db.users.filter((u) => u.role === 'doctor' && u.isActive).map(toDoctor));
+// GET /api/doctors — patients; active doctors only.
+export function getDoctors(): Promise<Doctor[]> {
+  return request('GET', '/doctors');
 }
 
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD
@@ -20,11 +18,6 @@ export async function getDoctors(): Promise<Doctor[]> {
 // free slots for manual appointments (ARCHITECTURE.md section 9).
 // A doctor may only ask for their own slots. Patients only see active doctors:
 // a deactivated doctor is a 404 for them, like a doctor that does not exist.
-export async function getDoctorSlots(doctorId: number, date: string): Promise<FreeSlot[]> {
-  await delay(200);
-  const user = requireLogin();
-  if (user.role === 'doctor' && user.id !== doctorId) throw new ApiError(403, 'You can only see your own free times.');
-  const doctor = db.users.find((u) => u.id === doctorId && u.role === 'doctor');
-  if (!doctor || (user.role === 'patient' && !doctor.isActive)) throw new ApiError(404, 'Doctor not found.');
-  return copy(computeFreeSlots(doctorId, date));
+export function getDoctorSlots(doctorId: number, date: string): Promise<FreeSlot[]> {
+  return request('GET', `/doctors/${doctorId}/slots?date=${encodeURIComponent(date)}`);
 }

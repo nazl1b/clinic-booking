@@ -37,3 +37,37 @@ export function toMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number)
   return hours * 60 + minutes
 }
+
+// 570 → "09:30"
+export function fromMinutes(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
+
+// 0 = Sunday … 6 = Saturday, like availability.day_of_week
+export function dayOfWeek(date: string): number {
+  return dateToDb(date).getUTCDay()
+}
+
+// "YYYY-MM-DD" that exists in the calendar ("2026-02-30" does not)
+export function isValidDate(date: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(dateToDb(date).getTime()) && dateFromDb(dateToDb(date)) === date
+}
+
+// Current date and time in the clinic's time zone (CLINIC_TIMEZONE, Europe/Athens).
+// The server itself runs in UTC on Render, so "now" and "today" are never taken
+// from the server's own clock settings.
+export function clinicNow(): { date: string; time: string } {
+  const timeZone = process.env.CLINIC_TIMEZONE
+  if (!timeZone) throw new Error('CLINIC_TIMEZONE is not set')
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date())
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` }
+}

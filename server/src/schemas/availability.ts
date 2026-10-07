@@ -1,10 +1,8 @@
 import { z } from 'zod'
 import { toMinutes } from '../utils/dates.js'
+import { timeSchema } from './common.js'
 
 const MAX_WINDOWS = 70 // 10 per day is far more than any real schedule needs
-
-// "HH:MM", 24-hour clock
-const timeSchema = z.string('Please enter times as HH:MM.').regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Please enter times as HH:MM.')
 
 const windowSchema = z
   .object({

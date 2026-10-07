@@ -26,6 +26,8 @@ services:
         value: Europe/Athens
       - key: EMAIL_PROVIDER
         value: brevo
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip # visitor IP for the rate limits (Cloudflare is in front of Render)
       - key: SESSION_SECRET
         generateValue: true
       - key: CRON_SECRET

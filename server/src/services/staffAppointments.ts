@@ -5,7 +5,7 @@ import { HttpError } from '../errors.js'
 import type { StaffAppointmentInput } from '../schemas/appointments.js'
 import { appointmentInclude } from '../serializers.js'
 import { dateToDb, timeToDb } from '../utils/dates.js'
-import { checkBlock, findSlot, inDoctorDayTransaction, SLOT_NOT_AVAILABLE, SLOT_TAKEN } from './slots.js'
+import { checkBlock, findSlot, inDoctorDayTransaction, lockActiveDoctor, SLOT_NOT_AVAILABLE, SLOT_TAKEN } from './slots.js'
 
 const BLOCK_NOT_AVAILABLE = 'This period is outside working hours or in the past.'
 const BLOCK_TAKEN = 'This period overlaps an appointment. Please choose another time.'
@@ -16,11 +16,11 @@ const BLOCK_TAKEN = 'This period overlaps an appointment. Please choose another 
 // 409 when the time is part of the working hours but taken, 400 for anything else.
 export function createStaffAppointment(input: StaffAppointmentInput, doctorId: number, createdBy: number) {
   return inDoctorDayTransaction(doctorId, input.date, async (tx) => {
-    const doctor = await tx.user.findFirst({ where: { id: doctorId, role: 'doctor', isActive: true } })
+    const doctorIsActive = await lockActiveDoctor(tx, doctorId)
     const common = { doctorId, createdBy, date: dateToDb(input.date), time: timeToDb(input.time), note: input.note }
 
     if (input.kind === 'manual') {
-      const slot = doctor ? await findSlot(tx, doctorId, input.date, input.time) : undefined
+      const slot = doctorIsActive ? await findSlot(tx, doctorId, input.date, input.time) : undefined
       if (!slot) throw new HttpError(400, SLOT_NOT_AVAILABLE)
       if (!slot.free) throw new HttpError(409, SLOT_TAKEN)
       return tx.appointment.create({
@@ -29,7 +29,7 @@ export function createStaffAppointment(input: StaffAppointmentInput, doctorId: n
       })
     }
 
-    const check = doctor ? await checkBlock(tx, doctorId, input.date, input.time, input.durationMinutes) : 'unavailable'
+    const check = doctorIsActive ? await checkBlock(tx, doctorId, input.date, input.time, input.durationMinutes) : 'unavailable'
     if (check === 'unavailable') throw new HttpError(400, BLOCK_NOT_AVAILABLE)
     if (check === 'taken') throw new HttpError(409, BLOCK_TAKEN)
     return tx.appointment.create({

@@ -1,9 +1,12 @@
 import express, { type ErrorRequestHandler } from 'express'
+import { HttpError } from './errors.js'
 import { loadUser } from './middleware/auth.js'
+import { adminRouter } from './routes/admin.js'
 import { appointmentsRouter } from './routes/appointments.js'
 import { authRouter } from './routes/auth.js'
 import { doctorRouter } from './routes/doctor.js'
 import { doctorsRouter } from './routes/doctors.js'
+import { invitationsRouter } from './routes/invitations.js'
 import { sessionMiddleware } from './session.js'
 
 export const app = express()
@@ -26,15 +29,23 @@ app.use('/api/auth', authRouter)
 app.use('/api/doctor', doctorRouter)
 app.use('/api/doctors', doctorsRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/invitations', invitationsRouter)
+app.use('/api/admin', adminRouter)
 
 // Any /api route not matched above
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
 
-// Client errors (e.g. invalid JSON body) keep their 4xx status.
+// Client errors (e.g. invalid JSON body) keep their 4xx status, and an HttpError
+// keeps its status and message (e.g. 502 when an email could not be sent).
 // Everything else is a 500 and its details stay in the server log.
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  if (err instanceof HttpError) {
+    if (err.status >= 500) console.error(err.cause ?? err)
+    res.status(err.status).json({ error: err.message })
+    return
+  }
   const status = Number(err?.status ?? err?.statusCode)
   if (status >= 400 && status < 500) {
     res.status(status).json({ error: err.expose ? err.message : 'Invalid request' })

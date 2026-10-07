@@ -121,3 +121,14 @@ export async function lockDoctorDay(tx: Prisma.TransactionClient, doctorId: numb
   // $executeRaw: the function returns `void`, which $queryRaw cannot read.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${doctorId}::int, ${dayNumber}::int)`
 }
+
+// Inside a booking transaction: true if `doctorId` is an active doctor, and keeps
+// the doctor's row locked (FOR SHARE) until the transaction ends. Deactivation
+// updates that row, so it waits for bookings in progress and then cancels them,
+// and a booking that comes after it sees the doctor as inactive. Either way no
+// active appointment is left for a deactivated doctor.
+export async function lockActiveDoctor(tx: Prisma.TransactionClient, doctorId: number): Promise<boolean> {
+  const rows = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id FROM users WHERE id = ${doctorId}::int AND role = 'doctor' AND is_active FOR SHARE`
+  return rows.length === 1
+}

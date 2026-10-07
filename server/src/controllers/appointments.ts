@@ -6,7 +6,7 @@ import { bookingSchema } from '../schemas/appointments.js'
 import { parse, parseId } from '../schemas/validate.js'
 import { appointmentInclude, toAppointmentJson } from '../serializers.js'
 import { APPOINTMENT_NOT_FOUND, cancelUpcoming } from '../services/appointments.js'
-import { findSlot, inDoctorDayTransaction, SLOT_NOT_AVAILABLE, SLOT_TAKEN } from '../services/slots.js'
+import { findSlot, inDoctorDayTransaction, lockActiveDoctor, SLOT_NOT_AVAILABLE, SLOT_TAKEN } from '../services/slots.js'
 import { dateToDb, timeToDb } from '../utils/dates.js'
 
 // POST /api/appointments — the server re-checks the slot and never trusts the browser:
@@ -18,8 +18,7 @@ export const bookAppointment: RequestHandler = async (req, res) => {
   const patient = req.user!
 
   const appointment = await inDoctorDayTransaction(doctorId, date, async (tx) => {
-    const doctor = await tx.user.findFirst({ where: { id: doctorId, role: 'doctor', isActive: true } })
-    const slot = doctor ? await findSlot(tx, doctorId, date, time) : undefined
+    const slot = (await lockActiveDoctor(tx, doctorId)) ? await findSlot(tx, doctorId, date, time) : undefined
     if (!slot) throw new HttpError(400, SLOT_NOT_AVAILABLE)
     if (!slot.free) throw new HttpError(409, SLOT_TAKEN)
 

@@ -4,6 +4,7 @@ import { loadUser } from './middleware/auth.js'
 import { adminRouter } from './routes/admin.js'
 import { appointmentsRouter } from './routes/appointments.js'
 import { authRouter } from './routes/auth.js'
+import { cronRouter } from './routes/cron.js'
 import { doctorRouter } from './routes/doctor.js'
 import { doctorsRouter } from './routes/doctors.js'
 import { invitationsRouter } from './routes/invitations.js'
@@ -21,6 +22,9 @@ app.use(express.json())
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
+
+// Called by the cron service with a secret key, not a session.
+app.use('/api/cron', cronRouter)
 
 // Every other /api route knows who is logged in (req.user), if anyone.
 app.use('/api', sessionMiddleware, loadUser)

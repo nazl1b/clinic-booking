@@ -71,3 +71,10 @@ export function clinicNow(): { date: string; time: string } {
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
   return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` }
 }
+
+// "2026-10-08", 1 → "2026-10-09"
+export function addDays(date: string, days: number): string {
+  const d = dateToDb(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return dateFromDb(d)
+}

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { getMyAvailability, saveMyAvailability } from '../controllers/availability.js'
+import { cancelMyScheduleAppointment, createMyScheduleAppointment, listMyScheduleAppointments } from '../controllers/doctorAppointments.js'
 import { requireLogin, requireRole } from '../middleware/auth.js'
 
 // Endpoints for the logged-in doctor: /api/doctor/*
@@ -9,3 +10,7 @@ doctorRouter.use(requireLogin, requireRole('doctor'))
 
 doctorRouter.get('/availability', getMyAvailability)
 doctorRouter.put('/availability', saveMyAvailability)
+
+doctorRouter.get('/appointments', listMyScheduleAppointments)
+doctorRouter.post('/appointments', createMyScheduleAppointment)
+doctorRouter.patch('/appointments/:id/cancel', cancelMyScheduleAppointment)

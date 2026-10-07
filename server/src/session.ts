@@ -1,5 +1,6 @@
 import connectPgSimple from 'connect-pg-simple'
 import session from 'express-session'
+import { prisma } from './db.js'
 
 declare module 'express-session' {
   interface SessionData {
@@ -35,3 +36,11 @@ export const sessionMiddleware = session({
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 })
+
+// Logs a user out everywhere by deleting their sessions from the database,
+// optionally keeping one (the session that made the request).
+export function deleteUserSessions(userId: number, exceptSessionId?: string): Promise<number> {
+  return exceptSessionId === undefined
+    ? prisma.$executeRaw`DELETE FROM "session" WHERE ("sess"->>'userId')::int = ${userId}`
+    : prisma.$executeRaw`DELETE FROM "session" WHERE ("sess"->>'userId')::int = ${userId} AND "sid" <> ${exceptSessionId}`
+}

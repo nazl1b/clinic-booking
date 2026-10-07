@@ -28,3 +28,26 @@ export const loginSchema = z.object(
   },
   { error: 'Please enter your email and password.' },
 )
+
+export const forgotPasswordSchema = z.object(
+  { email: emailSchema.pipe(z.email('Please enter a valid email.')) },
+  { error: 'Please enter a valid email.' },
+)
+
+export const INVALID_RESET_LINK = 'This link is invalid or has expired. Please request a new one.'
+
+export const resetPasswordSchema = z.object(
+  {
+    token: z.string({ error: INVALID_RESET_LINK }).min(1, INVALID_RESET_LINK),
+    password: newPasswordSchema,
+  },
+  { error: INVALID_RESET_LINK },
+)
+
+export const changePasswordSchema = z.object(
+  {
+    currentPassword: z.string({ error: 'Please enter your current password.' }).min(1, 'Please enter your current password.'),
+    newPassword: newPasswordSchema,
+  },
+  { error: 'Please enter your current and new password.' },
+)

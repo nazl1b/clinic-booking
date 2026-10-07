@@ -25,6 +25,9 @@ export const sessionMiddleware = session({
     tableName: 'session',
     // The table is created by the Prisma migration, not by connect-pg-simple.
     createTableIfMissing: false,
+    // Expired sessions are deleted every 15 minutes. Not in tests: the timer would
+    // keep the test run alive after the last test.
+    pruneSessionInterval: process.env.NODE_ENV === 'test' ? false : undefined,
   }),
   resave: false,
   saveUninitialized: false,

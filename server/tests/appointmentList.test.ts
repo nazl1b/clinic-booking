@@ -1,4 +1,4 @@
-// Appointment lists: server-side search, filters and pages of 20 (ARCHITECTURE.md section 10).
+// Appointment lists: server-side search, filters and pages of 20.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { dateToDb, fromMinutes, timeToDb } from '../src/utils/dates.js'
 import { createUser, inDays, insertAppointment, loginAs, prisma } from './helpers.js'

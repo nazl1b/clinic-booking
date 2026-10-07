@@ -1,4 +1,4 @@
-// Deactivating a doctor (ARCHITECTURE.md section 3, admin).
+// Deactivating a doctor.
 import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
 import { deleteUserSessions } from '../session.js'

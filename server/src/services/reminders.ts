@@ -1,4 +1,4 @@
-// Appointment reminders (ARCHITECTURE.md section 12). An external service
+// Appointment reminders. An external service
 // (cron-job.org) calls /api/cron/reminders once a day, because on Render's free
 // plan the server sleeps and a timer inside the app would not run reliably.
 import { prisma } from '../db.js'

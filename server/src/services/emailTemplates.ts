@@ -1,4 +1,4 @@
-// The four emails the app sends (ARCHITECTURE.md section 12), each as text and HTML.
+// The four emails the app sends, each as text and HTML.
 // Wording follows the client's mock emails. Names come from users, so every value
 // put into the HTML is escaped.
 import { formatDate } from '../utils/dates.js'

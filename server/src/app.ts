@@ -45,7 +45,7 @@ app.use('/api', (_req, res) => {
 })
 
 // Online, Express also serves the built React app (client/dist): page and API share
-// one domain, so the session cookie works without CORS (ARCHITECTURE.md section 4).
+// one domain, so the session cookie works without CORS.
 // In development Vite serves the client instead.
 const clientDist = fileURLToPath(new URL('../../client/dist/', import.meta.url))
 if (process.env.NODE_ENV === 'production') {

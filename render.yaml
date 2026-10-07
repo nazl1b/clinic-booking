@@ -1,5 +1,5 @@
 # Render Blueprint: one free web service in Frankfurt that runs the Express API
-# and serves the built React app (ARCHITECTURE.md sections 4 and 14).
+# and serves the built React app.
 # Secrets are never written here: `sync: false` makes Render ask for them when the
 # Blueprint is created, and `generateValue` lets Render create a random one.
 services:
@@ -28,6 +28,8 @@ services:
         value: brevo
       - key: CLIENT_IP_HEADER
         value: cf-connecting-ip # visitor IP for the rate limits (Cloudflare is in front of Render)
+      - key: PROTECT_DEMO_ACCOUNTS
+        value: "true" # the shared demo accounts cannot change or reset their password
       - key: SESSION_SECRET
         generateValue: true
       - key: CRON_SECRET

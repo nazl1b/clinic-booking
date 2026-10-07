@@ -1,4 +1,4 @@
-// Who may see which free slots (ARCHITECTURE.md section 10).
+// Who may see which free slots.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { app, createUser, inDays, loginAs, request, setHours } from './helpers.js'
 

@@ -4,7 +4,7 @@ export const MIN_PASSWORD_LENGTH = 8
 // bcrypt ignores everything after the first 72 bytes, so longer passwords are refused.
 const MAX_PASSWORD_BYTES = 72
 
-// Emails are compared and stored lowercase (ARCHITECTURE.md section 6).
+// Emails are compared and stored lowercase.
 export const emailSchema = z.string().trim().toLowerCase()
 
 export const newPasswordSchema = z

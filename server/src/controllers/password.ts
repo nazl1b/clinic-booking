@@ -1,4 +1,4 @@
-// Forgot / reset password and change password (ARCHITECTURE.md section 8).
+// Forgot / reset password and change password.
 import type { RequestHandler } from 'express'
 import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
@@ -10,6 +10,7 @@ import { PASSWORD_RESET_HOURS, passwordResetEmail } from '../services/emailTempl
 import { hashPassword, verifyPassword } from '../services/passwords.js'
 import { createToken, hashToken } from '../services/tokens.js'
 import { deleteUserSessions } from '../session.js'
+import { isProtectedDemoAccount } from '../utils/emails.js'
 
 const FORGOT_PASSWORD_MESSAGE = 'If this email exists, we sent you a link to reset your password.'
 
@@ -30,7 +31,8 @@ async function issuePasswordReset(user: User): Promise<void> {
 export const forgotPassword: RequestHandler = async (req, res) => {
   const { email } = parse(forgotPasswordSchema, req.body)
   const user = await prisma.user.findUnique({ where: { email } })
-  if (user?.isActive) {
+  // Shared demo accounts get no reset link (the answer stays the same).
+  if (user?.isActive && !isProtectedDemoAccount(user.email)) {
     // In the background: waiting for the database writes and the email service would
     // make the answer slower for existing emails and reveal which ones exist.
     issuePasswordReset(user).catch((err: unknown) => console.error('Password reset email failed:', err))
@@ -46,7 +48,7 @@ export const resetPassword: RequestHandler = async (req, res) => {
 
   const userId = await prisma.$transaction(async (tx) => {
     const reset = await tx.passwordReset.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: true } })
-    if (!reset?.user.isActive) return null
+    if (!reset?.user.isActive || isProtectedDemoAccount(reset.user.email)) return null
     // Marks the link as used only while it is still unused and not expired.
     // Of two simultaneous requests with the same link, only one gets count 1.
     const { count } = await tx.passwordReset.updateMany({
@@ -68,6 +70,9 @@ export const resetPassword: RequestHandler = async (req, res) => {
 export const changePassword: RequestHandler = async (req, res) => {
   const { currentPassword, newPassword } = parse(changePasswordSchema, req.body)
   const user = req.user!
+  if (isProtectedDemoAccount(user.email)) {
+    throw new HttpError(403, 'The password of a demo account cannot be changed.')
+  }
   if (!(await verifyPassword(currentPassword, user.passwordHash))) {
     throw new HttpError(400, 'Your current password is incorrect.')
   }

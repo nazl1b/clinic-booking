@@ -1,4 +1,4 @@
-// Doctor invitations (ARCHITECTURE.md section 7).
+// Doctor invitations.
 // The admin invites; the doctor opens the emailed link and sets their own password,
 // so nobody else ever knows it. A link works once and expires after 48 hours.
 import type { RequestHandler } from 'express'

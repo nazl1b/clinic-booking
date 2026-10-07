@@ -1,5 +1,5 @@
 // Appointment lists of the doctor and the admin: search, filters and one page,
-// all done in the database (ARCHITECTURE.md section 10).
+// all done in the database.
 import { prisma } from '../db.js'
 import type { Prisma } from '../generated/prisma/client.js'
 import { type AppointmentListQuery, DEFAULT_PAGE_SIZE } from '../schemas/appointments.js'

@@ -15,7 +15,7 @@ export function getDoctors(): Promise<Doctor[]> {
 
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD
 // Any logged-in role. Patients use it to book; doctors and admins use the same
-// free slots for manual appointments (ARCHITECTURE.md section 9).
+// free slots for manual appointments.
 // A doctor may only ask for their own slots. Patients only see active doctors:
 // a deactivated doctor is a 404 for them, like a doctor that does not exist.
 export function getDoctorSlots(doctorId: number, date: string): Promise<FreeSlot[]> {

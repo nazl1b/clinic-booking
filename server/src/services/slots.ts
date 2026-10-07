@@ -1,4 +1,4 @@
-// Free slots (ARCHITECTURE.md section 9). They are never stored; every call
+// Free slots. They are never stored; every call
 // computes them from the doctor's weekly hours, minus times that overlap an
 // active appointment (online, manual or block alike), minus times already past
 // in clinic time.

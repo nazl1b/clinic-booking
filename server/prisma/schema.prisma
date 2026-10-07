@@ -1,4 +1,4 @@
-// Database schema (ARCHITECTURE.md section 6).
+// Database schema.
 // Tables and columns are snake_case in the database, camelCase in TypeScript.
 // CHECK constraints cannot be expressed here: they live in the SQL of the migrations.
 

@@ -1,4 +1,4 @@
-// Weekly working hours of the logged-in doctor (ARCHITECTURE.md section 6, availability).
+// Weekly working hours of the logged-in doctor.
 import type { RequestHandler } from 'express'
 import { prisma } from '../db.js'
 import { availabilitySchema } from '../schemas/availability.js'

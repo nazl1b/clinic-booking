@@ -27,6 +27,13 @@ function Home() {
   return user ? <Navigate to={homePathFor(user.role)} replace /> : null;
 }
 
+// Unknown URLs keep the user's layout: sidebar when logged in, auth layout otherwise.
+function NotFoundLayout() {
+  const { user, loading } = useAuth();
+  if (loading) return <Muted>Loading…</Muted>;
+  return user ? <AppLayout /> : <AuthLayout />;
+}
+
 function NotFound() {
   return (
     <Card title="Page not found" titleLevel={1}>
@@ -45,14 +52,14 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Pages without sidebar */}
+          {/* Pages without sidebar (404 is at the end) */}
           <Route element={<AuthLayout />}>
             <Route path="login" element={<GuestOnly><Login /></GuestOnly>} />
             <Route path="register" element={<GuestOnly><Register /></GuestOnly>} />
-            <Route path="forgot-password" element={<ForgotPassword />} />
-            <Route path="reset-password" element={<ResetPassword />} />
+            <Route path="forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+            <Route path="reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
+            {/* Not GuestOnly: a logged-in user is asked to log out first */}
             <Route path="accept-invite" element={<AcceptInvite />} />
-            <Route path="*" element={<NotFound />} />
           </Route>
 
           {/* Logged-in pages: sidebar + top bar */}
@@ -73,6 +80,10 @@ export default function App() {
             {/* Admin */}
             <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
             <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
+          </Route>
+
+          <Route element={<NotFoundLayout />}>
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </BrowserRouter>

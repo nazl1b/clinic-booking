@@ -65,7 +65,14 @@ export default function BookSlot() {
       </div>
     );
   }
-  if (!doctor) return <Muted>Loading…</Muted>;
+  if (!doctor) {
+    return (
+      <div className="page">
+        {backLink}
+        <Muted>Loading…</Muted>
+      </div>
+    );
+  }
 
   if (booked) {
     return (

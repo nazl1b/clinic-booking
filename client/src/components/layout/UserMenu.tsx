@@ -11,6 +11,7 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, ty
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_LABELS } from '../../utils/roles';
+import { initialOf } from '../../utils/text';
 import { useTheme } from '../../utils/theme';
 import { Icon } from './Icon';
 
@@ -112,8 +113,6 @@ export function UserMenu() {
     navigate('/login');
   }
 
-  const initial = user.name.replace('Dr. ', '').charAt(0);
-
   return (
     <div className={`user-menu${open ? ' open' : ''}`} ref={rootRef} onPointerLeave={handlePointerLeave} onPointerEnter={handlePointerEnter}>
       <button
@@ -132,7 +131,7 @@ export function UserMenu() {
         }}
       >
         <span className="avatar avatar-sm" aria-hidden="true">
-          {initial}
+          {initialOf(user.name)}
         </span>
         <span className="user-chip-text">
           <span className="user-chip-name">{user.name}</span>

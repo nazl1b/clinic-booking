@@ -5,7 +5,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { AppointmentKind, AppointmentQuery, AppointmentStatus } from '../types';
-import { clinicToday } from '../utils/dates';
+import { clinicToday, isIsoDate } from '../utils/dates';
 
 export interface AppointmentFilters {
   search: string;
@@ -20,7 +20,6 @@ export interface AppointmentFilters {
 const FILTER_PARAMS = ['search', 'status', 'kind', 'from', 'to', 'doctor', 'page'];
 const STATUSES: AppointmentStatus[] = ['active', 'cancelled'];
 const KINDS: AppointmentKind[] = ['online', 'manual', 'block'];
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Without a `from` param the list starts today; `from=` (empty) means no lower bound.
 function parse(params: URLSearchParams): AppointmentFilters {
@@ -34,8 +33,8 @@ function parse(params: URLSearchParams): AppointmentFilters {
     search: params.get('search') ?? '',
     status: STATUSES.includes(status) ? status : '',
     kind: KINDS.includes(kind) ? kind : '',
-    from: from === null ? clinicToday() : DATE.test(from) ? from : '',
-    to: DATE.test(to) ? to : '',
+    from: from === null ? clinicToday() : isIsoDate(from) ? from : '',
+    to: isIsoDate(to) ? to : '',
     doctorId: Number.isInteger(doctor) && doctor > 0 ? doctor : null,
     page: Number.isInteger(page) && page > 1 ? page : 1,
   };

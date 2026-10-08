@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert';
 import { ButtonLink } from '../components/ui/Button';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import type { Doctor } from '../types';
+import { initialOf } from '../utils/text';
 
 export default function Doctors() {
   const [doctors, setDoctors] = useState<Doctor[] | null>(null);
@@ -30,14 +31,15 @@ export default function Doctors() {
 
       <Alert type="error">{error}</Alert>
       {!doctors && !error && <Muted>Loading doctors…</Muted>}
-      {doctors && visible.length === 0 && <Muted>No doctors found.</Muted>}
+      {doctors?.length === 0 && <Muted>There are no doctors to book with yet. Please check again later.</Muted>}
+      {doctors && doctors.length > 0 && visible.length === 0 && <Muted>No doctors match “{search.trim()}”.</Muted>}
 
       <div className="doctor-grid">
         {visible.map((doctor) => (
           <article key={doctor.id} className="card doctor-card">
             <div className="doctor-card-head">
               <span className="avatar" aria-hidden="true">
-                {doctor.name.replace('Dr. ', '').charAt(0)}
+                {initialOf(doctor.name)}
               </span>
               <div>
                 <h2 className="card-title">{doctor.name}</h2>

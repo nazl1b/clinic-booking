@@ -2,6 +2,7 @@
 // the page buttons. Shared by the doctor's and the admin's Appointments pages.
 
 import type { Appointment, Page } from '../types';
+import { plural } from '../utils/text';
 import { AppointmentTable } from './AppointmentTable';
 import { Muted } from './ui/PageHeader';
 import { Pagination } from './ui/Pagination';
@@ -22,7 +23,7 @@ export function AppointmentResults({ page, busy, isFiltered, showDoctor, onCance
   return (
     <div className={`results${busy ? ' results-busy' : ''}`} aria-busy={busy}>
       <Muted>
-        {page.total} appointment{page.total === 1 ? '' : 's'}
+        {plural(page.total, 'appointment')}
         {isFiltered ? ` ${page.total === 1 ? 'matches' : 'match'} these filters` : ' from today on'}
       </Muted>
       <AppointmentTable

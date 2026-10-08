@@ -1,6 +1,7 @@
 // Endpoints for the logged-in doctor: /api/doctor/*
 
 import type { Appointment, AppointmentQuery, AvailabilityRule, Page, StaffAppointmentInput } from '../types';
+import { MAX_PAGE_SIZE } from '../utils/limits';
 import { request, toQueryString } from './client';
 
 // GET /api/doctor/appointments?search=&status=&kind=&from=&to=&page=&pageSize=
@@ -9,6 +10,19 @@ export function getDoctorAppointments(query: AppointmentQuery = {}): Promise<Pag
   const { search, status, kind, from, to, page, pageSize } = query; // no doctor: the server uses the logged-in one
   const qs = toQueryString({ search, status, kind, from, to, page, pageSize });
   return request('GET', `/doctor/appointments${qs ? `?${qs}` : ''}`);
+}
+
+// Every appointment of one day, for the day schedule. A day rarely fills one
+// page, but cancelled appointments can pile up on the same times, so the
+// remaining pages are fetched too: the schedule never silently drops rows.
+// The server orders by date, time and id, so the pages join without gaps.
+export async function getDoctorDay(date: string): Promise<Appointment[]> {
+  const query = { from: date, to: date, pageSize: MAX_PAGE_SIZE };
+  const first = await getDoctorAppointments({ ...query, page: 1 });
+  const pageCount = Math.ceil(first.total / first.pageSize);
+  if (pageCount <= 1) return first.items;
+  const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => getDoctorAppointments({ ...query, page: i + 2 })));
+  return [first, ...rest].flatMap((p) => p.items);
 }
 
 // GET /api/doctor/availability

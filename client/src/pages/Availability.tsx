@@ -15,7 +15,7 @@ import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import type { AvailabilityRule } from '../types';
-import { DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
+import { CLINIC_TIMEZONE, DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
 
 // Monday first, as in a Greek calendar.
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -113,7 +113,7 @@ export default function Availability() {
 
   return (
     <div className="page">
-      <PageHeader title="Working hours" description="Patients can book only inside these hours. Times are in Greek time (Europe/Athens)." />
+      <PageHeader title="Working hours" description={`Patients can book only inside these hours. Times are in Greek time (${CLINIC_TIMEZONE}).`} />
 
       {!rules ? (
         error ? <Alert type="error">{error}</Alert> : <Muted>Loading…</Muted>

@@ -6,6 +6,8 @@ import { ApiError, getErrorMessage } from '../api/client';
 import type { FreeSlot } from '../api/doctors';
 import type { Doctor, StaffAppointmentInput } from '../types';
 import { clinicToday, formatDate } from '../utils/dates';
+import { NAME_MAX_LENGTH, NOTE_MAX_LENGTH, PHONE_MAX_LENGTH } from '../utils/limits';
+import { plural } from '../utils/text';
 import { SlotPicker } from './SlotPicker';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
@@ -24,6 +26,9 @@ interface StaffAppointmentFormProps {
 }
 
 type Kind = StaffAppointmentInput['kind'];
+
+// Lengths offered for blocked time, in slots of the doctor's appointment length.
+const BLOCK_LENGTH_OPTIONS = [1, 2, 3, 4, 6, 8];
 
 export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSlot, onSubmit, onClose }: StaffAppointmentFormProps) {
   const [kind, setKind] = useState<Kind>('manual');
@@ -113,18 +118,18 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       {kind === 'manual' ? (
         <FormRow>
           <Field label="Patient name">
-            <input value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={100} />
+            <input value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={NAME_MAX_LENGTH} />
           </Field>
           <Field label="Phone">
-            <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} required maxLength={30} />
+            <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} required maxLength={PHONE_MAX_LENGTH} />
           </Field>
         </FormRow>
       ) : (
         <Field label="Length">
           <select value={blockSlots} onChange={(e) => setBlockSlots(Number(e.target.value))}>
-            {[1, 2, 3, 4, 6, 8].map((n) => (
+            {BLOCK_LENGTH_OPTIONS.map((n) => (
               <option key={n} value={n}>
-                {slot ? `${n * slot.durationMinutes} minutes` : `${n} slot${n > 1 ? 's' : ''}`}
+                {slot ? plural(n * slot.durationMinutes, 'minute') : plural(n, 'slot')}
               </option>
             ))}
           </select>
@@ -132,7 +137,7 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       )}
 
       <Field label="Note (optional)">
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={kind === 'block' ? 'e.g. Lunch break' : undefined} maxLength={200} />
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={kind === 'block' ? 'e.g. Lunch break' : undefined} maxLength={NOTE_MAX_LENGTH} />
       </Field>
 
       <Alert type="error">{error}</Alert>

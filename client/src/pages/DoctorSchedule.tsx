@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
-import { cancelDoctorAppointment, createDoctorAppointment, getDoctorAppointments } from '../api/doctor';
+import { cancelDoctorAppointment, createDoctorAppointment, getDoctorDay } from '../api/doctor';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
 import { AppointmentTable } from '../components/AppointmentTable';
 import { DayNav } from '../components/DayNav';
@@ -15,17 +15,17 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { useStaffCancel } from '../hooks/useStaffCancel';
 import type { Appointment, StaffAppointmentInput } from '../types';
-import { clinicToday, formatDate } from '../utils/dates';
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+import { clinicToday, isIsoDate } from '../utils/dates';
+import { plural } from '../utils/text';
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
   const doctorId = user?.id;
   const [params, setParams] = useSearchParams();
   const dateParam = params.get('date') ?? '';
-  const date = DATE.test(dateParam) ? dateParam : clinicToday();
+  const date = isIsoDate(dateParam) ? dateParam : clinicToday();
 
   // The result remembers which request it belongs to; while that differs from
   // the current request, a newer day is on its way (the old one stays visible, dimmed).
@@ -33,22 +33,23 @@ export default function DoctorSchedule() {
   const dayKey = `${doctorId}|${date}|${reloadKey}`;
   const [day, setDay] = useState<{ key: string; appointments: Appointment[]; freeSlots: FreeSlot[] } | null>(null);
   const busy = day?.key !== dayKey;
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  // Like `day`, a load error belongs to one request: another day starts clean.
+  const [loadError, setLoadError] = useState<{ key: string; message: string } | null>(null);
+  const dayError = loadError?.key === dayKey ? loadError.message : '';
   const [showForm, setShowForm] = useState(false);
   const [formStart, setFormStart] = useState<{ date: string; slot: FreeSlot } | null>(null); // from "+ Add"
 
   const reload = () => setReloadKey((k) => k + 1);
+  const { handleCancel, cancellingId, error, success, clearMessages } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
   const listView = params.get('view') === 'list';
 
   // All of the day's appointments plus its free times.
   useEffect(() => {
     if (listView || doctorId === undefined) return;
     let ignore = false;
-    Promise.all([getDoctorAppointments({ from: date, to: date, pageSize: 100 }), getDoctorSlots(doctorId, date)])
-      .then(([found, free]) => !ignore && setDay({ key: dayKey, appointments: found.items, freeSlots: free }))
-      .catch((err) => !ignore && setError(getErrorMessage(err)));
+    Promise.all([getDoctorDay(date), getDoctorSlots(doctorId, date)])
+      .then(([appointments, freeSlots]) => !ignore && setDay({ key: dayKey, appointments, freeSlots }))
+      .catch((err) => !ignore && setLoadError({ key: dayKey, message: getErrorMessage(err) }));
     return () => {
       ignore = true;
     };
@@ -64,6 +65,7 @@ export default function DoctorSchedule() {
   }
 
   function setDate(d: string) {
+    clearMessages(); // a cancel message is about the day that was shown
     setParams((current) => {
       const next = new URLSearchParams(current);
       if (d === clinicToday()) next.delete('date');
@@ -76,29 +78,6 @@ export default function DoctorSchedule() {
     setFormStart(start);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' }); // the form opens above the schedule
-  }
-
-  async function handleCancel(a: Appointment) {
-    const who = a.kind === 'online' ? a.patientName : a.kind === 'manual' ? a.guestName : null;
-    const question =
-      a.kind === 'block'
-        ? `Remove the blocked time on ${formatDate(a.date)} at ${a.time}?`
-        : `Cancel the appointment with ${who} on ${formatDate(a.date)} at ${a.time}?` +
-          (a.kind === 'online' ? ' The patient will be notified by email.' : ' Please call the patient to let them know.');
-    if (!window.confirm(question)) return;
-
-    setError('');
-    setSuccess('');
-    setCancellingId(a.id);
-    try {
-      await cancelDoctorAppointment(a.id);
-      setSuccess(a.kind === 'block' ? 'Blocked time removed.' : 'Appointment cancelled.');
-      reload();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setCancellingId(null);
-    }
   }
 
   async function handleCreate(input: StaffAppointmentInput) {
@@ -138,15 +117,16 @@ export default function DoctorSchedule() {
           <DayNav date={date} onChange={setDate} />
         </div>
 
+        <Alert type="error">{dayError}</Alert>
         <Alert type="error">{error}</Alert>
         <Alert type="success">{success}</Alert>
 
-        {day === null ? (
+        {dayError ? null : day === null ? (
           <Muted>Loading…</Muted>
         ) : (
           <div className={`results${busy ? ' results-busy' : ''}`} aria-busy={busy}>
             <Muted>
-              {active} active appointment{active === 1 ? '' : 's'} · {day.freeSlots.length} free time{day.freeSlots.length === 1 ? '' : 's'}
+              {plural(active, 'active appointment')} · {plural(day.freeSlots.length, 'free time')}
             </Muted>
             <AppointmentTable
               appointments={day.appointments}

@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Field, FormActions } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { MIN_PASSWORD_LENGTH, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 import { ROLE_LABELS } from '../utils/roles';
 
 // "Change password" in the user menu links here: /profile#change-password
@@ -39,7 +40,7 @@ export default function Profile() {
     e.preventDefault();
     setSuccess('');
     if (newPassword !== confirm) {
-      setError('New passwords do not match.');
+      setError(PASSWORD_MISMATCH);
       return;
     }
     setError('');
@@ -84,8 +85,8 @@ export default function Profile() {
             ref={currentPasswordRef}
             type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autoComplete="current-password" />
         </Field>
-        <Field label="New password" hint="At least 8 characters.">
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+        <Field label="New password" hint={PASSWORD_HINT}>
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
         </Field>
         <Field label="Confirm new password">
           <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />

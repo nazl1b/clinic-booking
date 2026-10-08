@@ -5,13 +5,17 @@ import { acceptInvitation, getInvitation } from '../api/invitations';
 import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Field } from '../components/ui/Field';
+import { Field, FormActions } from '../components/ui/Field';
 import { Muted } from '../components/ui/PageHeader';
+import { homePathFor, useAuth } from '../context/AuthContext';
 import type { InvitationPreview } from '../types';
+import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 
 // Opened from the invitation email: /accept-invite?token=...
 // The doctor sets their own password; nobody else ever knows it.
+// Someone already logged in (e.g. the admin testing the link) must log out first.
 export default function AcceptInvite() {
+  const { user, loading: authLoading, logout } = useAuth();
   const token = useSearchParams()[0].get('token') ?? '';
   const navigate = useNavigate();
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
@@ -35,7 +39,7 @@ export default function AcceptInvite() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(PASSWORD_MISMATCH);
       return;
     }
     setError('');
@@ -49,7 +53,24 @@ export default function AcceptInvite() {
     }
   }
 
-  const loadError = token ? fetchError : 'This link is missing its token. Please use the link from the email.';
+  if (user) {
+    return (
+      <Card title="Invitation" titleLevel={1}>
+        <Alert type="warning">
+          You are logged in as {user.name} ({user.email}). Please log out first to accept this invitation.
+        </Alert>
+        <Alert type="error">{error}</Alert>
+        <FormActions>
+          <Button onClick={() => logout().catch((err) => setError(getErrorMessage(err)))}>Log out</Button>
+          <ButtonLink to={homePathFor(user.role)} variant="tertiary">
+            Go to your home page
+          </ButtonLink>
+        </FormActions>
+      </Card>
+    );
+  }
+
+  const loadError = token ? fetchError : MISSING_TOKEN;
   if (loadError) {
     return (
       <Card title="Invitation" titleLevel={1}>
@@ -64,7 +85,13 @@ export default function AcceptInvite() {
     );
   }
 
-  if (!invitation) return <Muted>Checking invitation…</Muted>;
+  if (authLoading || !invitation) {
+    return (
+      <Card title="Invitation" titleLevel={1}>
+        <Muted>Checking invitation…</Muted>
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -79,8 +106,8 @@ export default function AcceptInvite() {
         <dt>Specialty</dt>
         <dd>{invitation.specialty}</dd>
       </dl>
-      <Field label="Password" hint="At least 8 characters.">
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" autoFocus />
+      <Field label="Password" hint={PASSWORD_HINT}>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" autoFocus />
       </Field>
       <Field label="Confirm password">
         <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />

@@ -23,7 +23,7 @@ export function RequireRole({ roles, children }: RequireRoleProps) {
 
   if (roles && !roles.includes(user.role)) {
     return (
-      <Card title="No access">
+      <Card title="No access" titleLevel={1}>
         <Muted>This page is not available for your account.</Muted>
         <div>
           <ButtonLink to={homePathFor(user.role)} variant="secondary">

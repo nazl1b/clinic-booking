@@ -3,6 +3,12 @@
 // Dates are plain "YYYY-MM-DD" strings and times are "HH:MM" strings.
 
 export const CLINIC_TIMEZONE = 'Europe/Athens';
+const LOCALE = 'en-GB'; // day before month: "Mon, 6 Oct 2026"
+
+// A "YYYY-MM-DD" string, e.g. from the URL.
+export function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
 
 // Current date and time in the clinic's time zone.
 export function clinicNow(): { date: string; time: string } {
@@ -67,7 +73,7 @@ export function isPast(date: string, time: string): boolean {
 
 // "Mon, 6 Oct 2026"
 export function formatDate(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat(LOCALE, {
     timeZone: 'UTC',
     weekday: 'short',
     day: 'numeric',
@@ -78,12 +84,12 @@ export function formatDate(date: string): string {
 
 // "Mon"
 export function formatWeekday(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(toUtcDate(date));
+  return new Intl.DateTimeFormat(LOCALE, { timeZone: 'UTC', weekday: 'short' }).format(toUtcDate(date));
 }
 
 // "6 Oct 2026, 14:05" in clinic time, for ISO timestamps.
 export function formatTimestamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat(LOCALE, {
     timeZone: CLINIC_TIMEZONE,
     day: 'numeric',
     month: 'short',

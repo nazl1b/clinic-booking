@@ -20,17 +20,19 @@ import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { ActionsCell, Table } from '../components/ui/Table';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
+import { INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
+import { plural } from '../utils/text';
 
 interface PendingDeactivation {
   doctor: Doctor;
   upcomingCount: number;
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 export default function AdminDoctors() {
+  // Both lists are null until loaded; loadError replaces them when loading fails.
   const [doctors, setDoctors] = useState<Doctor[] | null>(null);
-  const [invitations, setInvitations] = useState<(Invitation & { expired: boolean })[]>([]);
+  const [invitations, setInvitations] = useState<(Invitation & { expired: boolean })[] | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null); // e.g. "invite-3", "doctor-2"
@@ -58,8 +60,9 @@ export default function AdminDoctors() {
         setDoctors(doctorList);
         const now = Date.now();
         setInvitations(invitationList.map((i) => ({ ...i, expired: new Date(i.expiresAt).getTime() < now })));
+        setLoadError('');
       })
-      .catch((err) => setError(getErrorMessage(err)));
+      .catch((err) => setLoadError(getErrorMessage(err)));
   }, []);
 
   useEffect(load, [load]);
@@ -90,7 +93,7 @@ export default function AdminDoctors() {
     setInviting(true);
     try {
       const invitation = await inviteDoctor({ name: inviteName, specialty: inviteSpecialty, email: inviteEmail });
-      setSuccess(`Invitation sent to ${invitation.email}. The link is valid for 48 hours.`);
+      setSuccess(`Invitation sent to ${invitation.email}. The link is valid for ${plural(INVITATION_HOURS, 'hour')}.`);
       setInviteName('');
       setInviteSpecialty('');
       setInviteEmail('');
@@ -151,6 +154,7 @@ export default function AdminDoctors() {
         description="Invite doctors, edit their details or deactivate them."
         actions={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite doctor</Button>}
       />
+      <Alert type="error">{loadError}</Alert>
       <Alert type="error">{error}</Alert>
       <Alert type="success">{success}</Alert>
 
@@ -211,10 +215,10 @@ export default function AdminDoctors() {
         <Card title="Invite a doctor" description="The doctor gets an email with a link to set their own password. You never see or set it." onSubmit={handleInvite}>
           <FormRow>
             <Field label="Name">
-              <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} required placeholder="Dr. …" maxLength={100} autoFocus />
+              <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} required placeholder="Dr. …" maxLength={NAME_MAX_LENGTH} autoFocus />
             </Field>
             <Field label="Specialty">
-              <input value={inviteSpecialty} onChange={(e) => setInviteSpecialty(e.target.value)} required maxLength={100} />
+              <input value={inviteSpecialty} onChange={(e) => setInviteSpecialty(e.target.value)} required maxLength={SPECIALTY_MAX_LENGTH} />
             </Field>
             <Field label="Email">
               <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
@@ -232,102 +236,111 @@ export default function AdminDoctors() {
         </Card>
       )}
 
-      <Card title="Pending invitations">
-        {invitations.length === 0 ? (
-          <Muted>No pending invitations.</Muted>
-        ) : (
-          <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Expires' }, { label: 'Actions', align: 'right', hidden: true }]}>
-            {invitations.map((inv) => {
-              const busy = busyId === `invite-${inv.id}`;
-              return (
-                <tr key={inv.id}>
-                  <td>{inv.name}</td>
-                  <td>{inv.specialty}</td>
-                  <td>{inv.email}</td>
-                  <td className="nowrap">{inv.expired ? <Badge tone="danger">Expired</Badge> : formatTimestamp(inv.expiresAt)}</td>
-                  <ActionsCell>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => run(`invite-${inv.id}`, () => resendInvitation(inv.id), `New link sent to ${inv.email}. The old link no longer works.`)}
-                    >
-                      Resend
-                    </Button>
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      danger
-                      disabled={busy}
-                      onClick={() =>
-                        window.confirm(`Cancel the invitation for ${inv.email}?`) &&
-                        run(`invite-${inv.id}`, () => cancelInvitation(inv.id), 'Invitation cancelled.')
-                      }
-                    >
-                      Cancel
-                    </Button>
-                  </ActionsCell>
-                </tr>
-              );
-            })}
-          </Table>
-        )}
-      </Card>
+      {!loadError && (
+        <Card title="Pending invitations">
+          {!invitations ? (
+            <Muted>Loading…</Muted>
+          ) : invitations.length === 0 ? (
+            <Muted>No pending invitations.</Muted>
+          ) : (
+            <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Expires' }, { label: 'Actions', align: 'right', hidden: true }]}>
+              {invitations.map((inv) => {
+                const busy = busyId === `invite-${inv.id}`;
+                return (
+                  <tr key={inv.id}>
+                    <td>{inv.name}</td>
+                    <td>{inv.specialty}</td>
+                    <td>{inv.email}</td>
+                    <td className="nowrap">{inv.expired ? <Badge tone="danger">Expired</Badge> : formatTimestamp(inv.expiresAt)}</td>
+                    <ActionsCell>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => run(`invite-${inv.id}`, () => resendInvitation(inv.id), `New link sent to ${inv.email}. The old link no longer works.`)}
+                      >
+                        Resend
+                      </Button>
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        danger
+                        disabled={busy}
+                        onClick={() =>
+                          window.confirm(`Cancel the invitation for ${inv.email}?`) &&
+                          run(`invite-${inv.id}`, () => cancelInvitation(inv.id), 'Invitation cancelled.')
+                        }
+                      >
+                        Cancel
+                      </Button>
+                    </ActionsCell>
+                  </tr>
+                );
+              })}
+            </Table>
+          )}
+        </Card>
 
-      <Card title="All doctors">
-        {!doctors ? (
-          <Muted>Loading…</Muted>
-        ) : (
-          <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Status' }, { label: 'Actions', align: 'right', hidden: true }]}>
-            {doctors.map((doctor) => {
-              const busy = busyId === `doctor-${doctor.id}`;
-              const editing = editingId === doctor.id;
-              return (
-                <tr key={doctor.id} className={doctor.isActive ? undefined : 'row-muted'}>
-                  <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} aria-label="Name" /> : doctor.name}</td>
-                  <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} aria-label="Specialty" /> : doctor.specialty}</td>
-                  <td>{doctor.email}</td>
-                  <td>
-                    <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
-                  </td>
-                  <ActionsCell>
-                    {editing ? (
-                      <>
-                        <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
-                          Save
-                        </Button>
-                        <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
-                          Edit
-                        </Button>
-                        {doctor.isActive ? (
-                          <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
-                            Deactivate
+      )}
+
+      {!loadError && (
+        <Card title="All doctors">
+          {!doctors ? (
+            <Muted>Loading…</Muted>
+          ) : doctors.length === 0 ? (
+            <Muted>No doctors yet. Invite a doctor to get started.</Muted>
+          ) : (
+            <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Status' }, { label: 'Actions', align: 'right', hidden: true }]}>
+              {doctors.map((doctor) => {
+                const busy = busyId === `doctor-${doctor.id}`;
+                const editing = editingId === doctor.id;
+                return (
+                  <tr key={doctor.id} className={doctor.isActive ? undefined : 'row-muted'}>
+                    <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
+                    <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
+                    <td>{doctor.email}</td>
+                    <td>
+                      <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
+                    </td>
+                    <ActionsCell>
+                      {editing ? (
+                        <>
+                          <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
+                            Save
                           </Button>
-                        ) : (
-                          <Button
-                            variant="tertiary"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
-                          >
-                            Reactivate
+                          <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
+                            Cancel
                           </Button>
-                        )}
-                      </>
-                    )}
-                  </ActionsCell>
-                </tr>
-              );
-            })}
-          </Table>
-        )}
-      </Card>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
+                            Edit
+                          </Button>
+                          {doctor.isActive ? (
+                            <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
+                              Deactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="tertiary"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
+                            >
+                              Reactivate
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </ActionsCell>
+                  </tr>
+                );
+              })}
+            </Table>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

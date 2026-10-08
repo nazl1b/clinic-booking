@@ -2,10 +2,9 @@
  * Global styles. Every colour, radius and spacing comes from the tokens below,
  * so all panels (patient, doctor, admin) look the same. Light and dark theme.
  *
- * Design language: "Clinical Sage" (see ui-designs/03-clinical-sage.html).
- * Neutral surfaces, a dark forest-green sidebar, one sans typeface, small radii,
- * borders instead of shadows, semantic status colours and short motion that
- * only reacts to what the user does.
+ * Design language: "Clinical Sage". Neutral surfaces, a dark forest-green
+ * sidebar, one sans typeface, small radii, borders instead of shadows,
+ * semantic status colours and short motion that only reacts to what the user does.
  */
 
 :root {

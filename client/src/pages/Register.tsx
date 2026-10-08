@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { useAuth } from '../context/AuthContext';
+import { MIN_PASSWORD_LENGTH, NAME_MAX_LENGTH, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 
 // Patient sign-up. Doctors join by invitation and admins come from the seed script.
 export default function Register() {
@@ -21,7 +22,7 @@ export default function Register() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(PASSWORD_MISMATCH);
       return;
     }
     setError('');
@@ -38,13 +39,13 @@ export default function Register() {
   return (
     <Card title="Create an account" titleLevel={1} description="Book appointments online, without a phone call." onSubmit={handleSubmit}>
       <Field label="Full name">
-        <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" maxLength={100} />
+        <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" maxLength={NAME_MAX_LENGTH} />
       </Field>
       <Field label="Email">
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       </Field>
-      <Field label="Password" hint="At least 8 characters.">
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+      <Field label="Password" hint={PASSWORD_HINT}>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
       </Field>
       <Field label="Confirm password">
         <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />

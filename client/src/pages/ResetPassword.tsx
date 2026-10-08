@@ -7,6 +7,7 @@ import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { useAuth } from '../context/AuthContext';
+import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 
 // Opened from the email link: /reset-password?token=...
 export default function ResetPassword() {
@@ -21,7 +22,7 @@ export default function ResetPassword() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(PASSWORD_MISMATCH);
       return;
     }
     setError('');
@@ -47,7 +48,7 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <Card title="Reset password" titleLevel={1}>
-        <Alert type="error">This link is missing its token. Please use the link from the email.</Alert>
+        <Alert type="error">{MISSING_TOKEN}</Alert>
         {newLinkButton}
       </Card>
     );
@@ -55,8 +56,8 @@ export default function ResetPassword() {
 
   return (
     <Card title="Set a new password" titleLevel={1} onSubmit={handleSubmit}>
-      <Field label="New password" hint="At least 8 characters.">
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" autoFocus />
+      <Field label="New password" hint={PASSWORD_HINT}>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" autoFocus />
       </Field>
       <Field label="Confirm new password">
         <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />

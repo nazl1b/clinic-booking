@@ -5,6 +5,8 @@ import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { PASSWORD_RESET_HOURS } from '../utils/limits';
+import { plural } from '../utils/text';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -30,7 +32,9 @@ export default function ForgotPassword() {
     <Card
       title="Forgot password"
       titleLevel={1}
-      description={message ? undefined : 'Enter your email and we will send you a link to set a new password. The link is valid for 1 hour.'}
+      description={
+        message ? undefined : `Enter your email and we will send you a link to set a new password. The link is valid for ${plural(PASSWORD_RESET_HOURS, 'hour')}.`
+      }
       onSubmit={handleSubmit}
     >
       {message ? (

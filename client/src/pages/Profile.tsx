@@ -9,8 +9,10 @@ import { FormActions } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
-import { MIN_PASSWORD_LENGTH, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
+import { useFieldErrors } from '../hooks/useFieldErrors';
+import { MIN_PASSWORD_LENGTH, PASSWORD_HINT } from '../utils/limits';
 import { ROLE_LABELS } from '../utils/roles';
+import { checkConfirmPassword, checkNewPassword, required } from '../utils/validation';
 
 // "Change password" in the user menu links here: /profile#change-password
 const PASSWORD_SECTION_ID = 'change-password';
@@ -25,6 +27,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { errors, validate } = useFieldErrors<'currentPassword' | 'newPassword' | 'confirm'>();
 
   // Coming from "Change password": scroll to the form and focus its first field.
   // location.key makes it run again when the link is used while already here.
@@ -37,14 +40,16 @@ export default function Profile() {
 
   if (!user) return null;
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSuccess('');
-    if (newPassword !== confirm) {
-      setError(PASSWORD_MISMATCH);
-      return;
-    }
     setError('');
+    const valid = validate(e.currentTarget, {
+      currentPassword: required(currentPassword, 'Please enter your current password.'),
+      newPassword: checkNewPassword(newPassword),
+      confirm: checkConfirmPassword(confirm, newPassword),
+    });
+    if (!valid) return;
     setSubmitting(true);
     try {
       await changePassword({ currentPassword, newPassword });
@@ -83,6 +88,7 @@ export default function Profile() {
       <Card title="Change password" id={PASSWORD_SECTION_ID} onSubmit={handleSubmit}>
         <PasswordInput
           label="Current password"
+          error={errors.currentPassword}
           ref={currentPasswordRef}
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
@@ -92,6 +98,7 @@ export default function Profile() {
         <PasswordInput
           label="New password"
           hint={PASSWORD_HINT}
+          error={errors.newPassword}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
@@ -100,6 +107,7 @@ export default function Profile() {
         />
         <PasswordInput
           label="Confirm new password"
+          error={errors.confirm}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           required

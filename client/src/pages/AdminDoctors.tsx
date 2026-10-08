@@ -18,10 +18,12 @@ import { Card } from '../components/ui/Card';
 import { Field, FormActions, FormRow } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { ActionsCell, Table } from '../components/ui/Table';
+import { useFieldErrors } from '../hooks/useFieldErrors';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
 import { INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
 import { plural } from '../utils/text';
+import { checkEmail, required } from '../utils/validation';
 
 interface PendingDeactivation {
   doctor: Doctor;
@@ -44,6 +46,7 @@ export default function AdminDoctors() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
+  const { errors: inviteErrors, validate: validateInvite } = useFieldErrors<'name' | 'specialty' | 'email'>();
 
   // Inline edit
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -86,10 +89,16 @@ export default function AdminDoctors() {
     }
   }
 
-  async function handleInvite(e: FormEvent) {
+  async function handleInvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setInviteError('');
     setSuccess('');
+    const valid = validateInvite(e.currentTarget, {
+      name: required(inviteName, "Please enter the doctor's name."),
+      specialty: required(inviteSpecialty, 'Please enter the specialty.'),
+      email: checkEmail(inviteEmail),
+    });
+    if (!valid) return;
     setInviting(true);
     try {
       const invitation = await inviteDoctor({ name: inviteName, specialty: inviteSpecialty, email: inviteEmail });
@@ -214,13 +223,13 @@ export default function AdminDoctors() {
       {showInvite && (
         <Card title="Invite a doctor" description="The doctor gets an email with a link to set their own password. You never see or set it." onSubmit={handleInvite}>
           <FormRow>
-            <Field label="Name">
+            <Field label="Name" error={inviteErrors.name}>
               <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} required placeholder="Dr. …" maxLength={NAME_MAX_LENGTH} autoFocus />
             </Field>
-            <Field label="Specialty">
+            <Field label="Specialty" error={inviteErrors.specialty}>
               <input value={inviteSpecialty} onChange={(e) => setInviteSpecialty(e.target.value)} required maxLength={SPECIALTY_MAX_LENGTH} />
             </Field>
-            <Field label="Email">
+            <Field label="Email" error={inviteErrors.email}>
               <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
             </Field>
           </FormRow>

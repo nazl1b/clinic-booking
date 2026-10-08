@@ -7,7 +7,9 @@ import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
-import { MIN_PASSWORD_LENGTH, NAME_MAX_LENGTH, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
+import { useFieldErrors } from '../hooks/useFieldErrors';
+import { MIN_PASSWORD_LENGTH, NAME_MAX_LENGTH, PASSWORD_HINT } from '../utils/limits';
+import { checkConfirmPassword, checkEmail, checkNewPassword, required } from '../utils/validation';
 
 // Patient sign-up. Doctors join by invitation and admins come from the seed script.
 export default function Register() {
@@ -19,14 +21,18 @@ export default function Register() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { errors, validate } = useFieldErrors<'name' | 'email' | 'password' | 'confirm'>();
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (password !== confirm) {
-      setError(PASSWORD_MISMATCH);
-      return;
-    }
     setError('');
+    const valid = validate(e.currentTarget, {
+      name: required(name, 'Please enter your full name.'),
+      email: checkEmail(email),
+      password: checkNewPassword(password),
+      confirm: checkConfirmPassword(confirm, password),
+    });
+    if (!valid) return;
     setSubmitting(true);
     try {
       await register(name, email, password);
@@ -38,16 +44,17 @@ export default function Register() {
   }
 
   return (
-    <Card title="Create an account" titleLevel={1} description="Book appointments online, without a phone call." onSubmit={handleSubmit}>
-      <Field label="Full name">
+    <Card title="Create an account" titleLevel={1} onSubmit={handleSubmit}>
+      <Field label="Full name" error={errors.name}>
         <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" maxLength={NAME_MAX_LENGTH} />
       </Field>
-      <Field label="Email">
+      <Field label="Email" error={errors.email}>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       </Field>
       <PasswordInput
         label="Password"
         hint={PASSWORD_HINT}
+        error={errors.password}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
@@ -56,6 +63,7 @@ export default function Register() {
       />
       <PasswordInput
         label="Confirm password"
+        error={errors.confirm}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         required

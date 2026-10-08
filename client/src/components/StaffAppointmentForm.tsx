@@ -4,10 +4,12 @@
 import { useState, type FormEvent } from 'react';
 import { ApiError, getErrorMessage } from '../api/client';
 import type { FreeSlot } from '../api/doctors';
+import { useFieldErrors } from '../hooks/useFieldErrors';
 import type { Doctor, StaffAppointmentInput } from '../types';
 import { clinicToday, formatDate } from '../utils/dates';
 import { NAME_MAX_LENGTH, NOTE_MAX_LENGTH, PHONE_MAX_LENGTH } from '../utils/limits';
 import { plural } from '../utils/text';
+import { required } from '../utils/validation';
 import { SlotPicker } from './SlotPicker';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
@@ -43,15 +45,22 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const { errors, validate } = useFieldErrors<'guestName' | 'guestPhone'>();
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    // Patient name and phone are only on the form for a phone appointment.
+    const valid = validate(e.currentTarget, {
+      guestName: kind === 'manual' ? required(guestName, "Please enter the patient's name.") : undefined,
+      guestPhone: kind === 'manual' ? required(guestPhone, 'Please enter a phone number.') : undefined,
+    });
+    if (!valid) return;
     if (selectedDoctorId === null || !slot) {
       setError('Please choose a time.');
       return;
     }
-    setError('');
-    setSuccess('');
     setSaving(true);
     const common = { doctorId: selectedDoctorId, date, time: slot.time, note };
     try {
@@ -117,10 +126,10 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
 
       {kind === 'manual' ? (
         <FormRow>
-          <Field label="Patient name">
+          <Field label="Patient name" error={errors.guestName}>
             <input value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={NAME_MAX_LENGTH} />
           </Field>
-          <Field label="Phone">
+          <Field label="Phone" error={errors.guestPhone}>
             <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} required maxLength={PHONE_MAX_LENGTH} />
           </Field>
         </FormRow>

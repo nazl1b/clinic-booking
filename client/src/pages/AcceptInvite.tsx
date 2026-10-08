@@ -6,11 +6,13 @@ import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
-import { PasswordInput } from '../components/ui/PasswordInput';
 import { Muted } from '../components/ui/PageHeader';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { homePathFor, useAuth } from '../context/AuthContext';
+import { useFieldErrors } from '../hooks/useFieldErrors';
 import type { InvitationPreview } from '../types';
-import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
+import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';
+import { checkConfirmPassword, checkNewPassword } from '../utils/validation';
 
 // Opened from the invitation email: /accept-invite?token=...
 // The doctor sets their own password; nobody else ever knows it.
@@ -25,6 +27,7 @@ export default function AcceptInvite() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { errors, validate } = useFieldErrors<'password' | 'confirm'>();
 
   useEffect(() => {
     if (!token) return;
@@ -37,13 +40,10 @@ export default function AcceptInvite() {
     };
   }, [token]);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (password !== confirm) {
-      setError(PASSWORD_MISMATCH);
-      return;
-    }
     setError('');
+    if (!validate(e.currentTarget, { password: checkNewPassword(password), confirm: checkConfirmPassword(confirm, password) })) return;
     setSubmitting(true);
     try {
       await acceptInvitation(token, password);
@@ -110,6 +110,7 @@ export default function AcceptInvite() {
       <PasswordInput
         label="Password"
         hint={PASSWORD_HINT}
+        error={errors.password}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
@@ -119,6 +120,7 @@ export default function AcceptInvite() {
       />
       <PasswordInput
         label="Confirm password"
+        error={errors.confirm}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         required

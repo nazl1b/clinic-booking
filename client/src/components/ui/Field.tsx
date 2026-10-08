@@ -1,22 +1,55 @@
 // Form building blocks. Inputs and selects stay native elements; they get
 // their look from the global styles, so every form looks the same.
 
-import type { ReactNode } from 'react';
+import { cloneElement, useId, type ReactElement, type ReactNode } from 'react';
+import { noteIdFor } from '../../utils/validation';
+
+// What Field sets on its control.
+interface ControlProps {
+  id?: string;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+}
 
 interface FieldProps {
   label: string;
   hint?: ReactNode;
+  error?: string; // shown in red under the control, in place of the hint
   inline?: boolean; // label next to the control instead of above it
-  children: ReactNode; // the <input> / <select>
+  children: ReactElement<ControlProps>; // the <input> / <select>
 }
 
-export function Field({ label, hint, inline, children }: FieldProps) {
+// The label points at the control (htmlFor) instead of wrapping it, so the
+// hint and the error are not read out as part of the field's name; they are
+// linked with aria-describedby instead.
+export function Field({ label, hint, error, inline, children }: FieldProps) {
+  const generatedId = useId();
+  const id = children.props.id ?? generatedId;
   return (
-    <label className={`field${inline ? ' field-inline' : ''}`}>
-      <span className="field-label">{label}</span>
-      {children}
-      {hint && <small className="field-hint">{hint}</small>}
-    </label>
+    <div className={`field${inline ? ' field-inline' : ''}`}>
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      {cloneElement(children, { id, 'aria-invalid': error ? true : undefined, 'aria-describedby': noteIdFor(id, hint, error) })}
+      <FieldNote id={id} hint={hint} error={error} />
+    </div>
+  );
+}
+
+// The line under a control: its error if it has one, otherwise its hint.
+export function FieldNote({ id, hint, error }: { id: string; hint?: ReactNode; error?: string }) {
+  if (error) {
+    return (
+      <p id={`${id}-error`} className="field-error">
+        {error}
+      </p>
+    );
+  }
+  if (!hint) return null;
+  return (
+    <small id={`${id}-hint`} className="field-hint">
+      {hint}
+    </small>
   );
 }
 

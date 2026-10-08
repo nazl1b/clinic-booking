@@ -1,4 +1,6 @@
 // White box that groups content. With `onSubmit` it renders as a <form>.
+// Forms skip the browser's own validation bubbles (noValidate): pages check
+// on submit and show messages under the fields (useFieldErrors).
 
 import type { FormEvent, ReactNode } from 'react';
 
@@ -30,7 +32,7 @@ export function Card({ title, titleLevel = 2, description, actions, tone = 'defa
 
   if (onSubmit) {
     return (
-      <form className={className} onSubmit={onSubmit} role={role} id={id}>
+      <form className={className} onSubmit={onSubmit} role={role} id={id} noValidate>
         {header}
         {children}
       </form>

@@ -7,7 +7,9 @@ import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
-import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
+import { useFieldErrors } from '../hooks/useFieldErrors';
+import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';
+import { checkConfirmPassword, checkNewPassword } from '../utils/validation';
 
 // Opened from the email link: /reset-password?token=...
 export default function ResetPassword() {
@@ -18,14 +20,12 @@ export default function ResetPassword() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { errors, validate } = useFieldErrors<'password' | 'confirm'>();
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (password !== confirm) {
-      setError(PASSWORD_MISMATCH);
-      return;
-    }
     setError('');
+    if (!validate(e.currentTarget, { password: checkNewPassword(password), confirm: checkConfirmPassword(confirm, password) })) return;
     setSubmitting(true);
     try {
       await resetPassword({ token, password });
@@ -59,6 +59,7 @@ export default function ResetPassword() {
       <PasswordInput
         label="New password"
         hint={PASSWORD_HINT}
+        error={errors.password}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
@@ -68,6 +69,7 @@ export default function ResetPassword() {
       />
       <PasswordInput
         label="Confirm new password"
+        error={errors.confirm}
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         required

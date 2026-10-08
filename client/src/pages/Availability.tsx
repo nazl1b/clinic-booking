@@ -4,7 +4,8 @@
 // Each day is one collapsed line with a summary; clicking it opens the day
 // (accordion) to edit its hours. All days are saved together.
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useState, type FormEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { getErrorMessage } from '../api/client';
 import { getMyAvailability, saveMyAvailability } from '../api/doctor';
 import { Icon } from '../components/layout/Icon';
@@ -16,10 +17,18 @@ import { FormActions } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import type { AvailabilityRule } from '../types';
 import { CLINIC_TIMEZONE, DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
+import { checkTime, focusFirstInvalid } from '../utils/validation';
 
 // Monday first, as in a Greek calendar.
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const SLOT_OPTIONS = [10, 15, 20, 30, 45, 60];
+
+// Problem with one row of hours: the message and which of its two times is wrong.
+interface RowError {
+  message: string;
+  start: boolean;
+  end: boolean;
+}
 
 function sortRules(rules: AvailabilityRule[]): AvailabilityRule[] {
   return [...rules].sort(
@@ -50,6 +59,7 @@ export default function Availability() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
+  const [rowErrors, setRowErrors] = useState<Record<number, RowError>>({}); // by index in `rules`, checked on save
 
   useEffect(() => {
     getMyAvailability()
@@ -84,19 +94,29 @@ export default function Availability() {
 
   function removeRule(index: number) {
     setRules((current) => current && current.filter((_, i) => i !== index));
+    setRowErrors({}); // the indexes move
     setSuccess('');
   }
 
-  async function handleSave(e: FormEvent) {
+  async function handleSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!rules) return;
     setError('');
     setSuccess('');
-    // A collapsed day's inputs are not in the form, so the browser cannot check them.
-    const incomplete = rules.find((r) => !r.startTime || !r.endTime);
-    if (incomplete) {
-      setOpenDays((current) => new Set(current).add(incomplete.dayOfWeek));
-      setError(`Please fill in both times for ${DAY_NAMES[incomplete.dayOfWeek]}.`);
+    const found: Record<number, RowError> = {};
+    rules.forEach((rule, index) => {
+      const start = checkTime(rule.startTime);
+      const end = checkTime(rule.endTime);
+      if (start || end) found[index] = { message: (start ?? end)!, start: Boolean(start), end: Boolean(end) };
+    });
+    const daysWithErrors = Object.keys(found).map((index) => rules[Number(index)].dayOfWeek);
+    // Open the days with a problem (a collapsed day has no inputs to focus), then focus the first one.
+    flushSync(() => {
+      setRowErrors(found);
+      if (daysWithErrors.length > 0) setOpenDays((current) => new Set([...current, ...daysWithErrors]));
+    });
+    if (daysWithErrors.length > 0) {
+      focusFirstInvalid(e.currentTarget);
       return;
     }
     setSaving(true);
@@ -154,32 +174,47 @@ export default function Availability() {
                         </label>
                       )}
                       {working ? (
-                        entries.map(({ rule, index }) => (
-                          <div key={index} className="hours-row">
-                            <input
-                              type="time"
-                              value={rule.startTime}
-                              step={300}
-                              required
-                              onChange={(e) => updateRule(index, { startTime: e.target.value })}
-                              aria-label={`${DAY_NAMES[day]} from`}
-                            />
-                            <span className="hours-sep" aria-hidden="true">
-                              –
-                            </span>
-                            <input
-                              type="time"
-                              value={rule.endTime}
-                              step={300}
-                              required
-                              onChange={(e) => updateRule(index, { endTime: e.target.value })}
-                              aria-label={`${DAY_NAMES[day]} to`}
-                            />
-                            <Button variant="tertiary" size="sm" danger onClick={() => removeRule(index)}>
-                              Remove
-                            </Button>
-                          </div>
-                        ))
+                        entries.map(({ rule, index }) => {
+                          const rowError = rowErrors[index];
+                          const errorId = `${bodyId}-${index}-error`;
+                          return (
+                            <Fragment key={index}>
+                              <div className="hours-row">
+                                <input
+                                  type="time"
+                                  value={rule.startTime}
+                                  step={300}
+                                  required
+                                  onChange={(e) => updateRule(index, { startTime: e.target.value })}
+                                  aria-label={`${DAY_NAMES[day]} from`}
+                                  aria-invalid={rowError?.start || undefined}
+                                  aria-describedby={rowError ? errorId : undefined}
+                                />
+                                <span className="hours-sep" aria-hidden="true">
+                                  –
+                                </span>
+                                <input
+                                  type="time"
+                                  value={rule.endTime}
+                                  step={300}
+                                  required
+                                  onChange={(e) => updateRule(index, { endTime: e.target.value })}
+                                  aria-label={`${DAY_NAMES[day]} to`}
+                                  aria-invalid={rowError?.end || undefined}
+                                  aria-describedby={rowError ? errorId : undefined}
+                                />
+                                <Button variant="tertiary" size="sm" danger onClick={() => removeRule(index)}>
+                                  Remove
+                                </Button>
+                              </div>
+                              {rowError && (
+                                <p id={errorId} className="field-error">
+                                  {rowError.message}
+                                </p>
+                              )}
+                            </Fragment>
+                          );
+                        })
                       ) : (
                         <Muted>Closed. Add hours to let patients book on {DAY_NAMES[day]}s.</Muted>
                       )}

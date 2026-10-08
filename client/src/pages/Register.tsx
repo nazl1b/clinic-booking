@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
 import { MIN_PASSWORD_LENGTH, NAME_MAX_LENGTH, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 
@@ -44,12 +45,22 @@ export default function Register() {
       <Field label="Email">
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       </Field>
-      <Field label="Password" hint={PASSWORD_HINT}>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
-      </Field>
-      <Field label="Confirm password">
-        <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
-      </Field>
+      <PasswordInput
+        label="Password"
+        hint={PASSWORD_HINT}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        autoComplete="new-password"
+      />
+      <PasswordInput
+        label="Confirm password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        required
+        autoComplete="new-password"
+      />
       <Alert type="error">{error}</Alert>
       <Button type="submit" block disabled={submitting}>
         {submitting ? 'Creating account…' : 'Create account'}

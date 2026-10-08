@@ -5,7 +5,8 @@ import { acceptInvitation, getInvitation } from '../api/invitations';
 import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Field, FormActions } from '../components/ui/Field';
+import { FormActions } from '../components/ui/Field';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { Muted } from '../components/ui/PageHeader';
 import { homePathFor, useAuth } from '../context/AuthContext';
 import type { InvitationPreview } from '../types';
@@ -106,12 +107,23 @@ export default function AcceptInvite() {
         <dt>Specialty</dt>
         <dd>{invitation.specialty}</dd>
       </dl>
-      <Field label="Password" hint={PASSWORD_HINT}>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" autoFocus />
-      </Field>
-      <Field label="Confirm password">
-        <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
-      </Field>
+      <PasswordInput
+        label="Password"
+        hint={PASSWORD_HINT}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        autoComplete="new-password"
+        autoFocus
+      />
+      <PasswordInput
+        label="Confirm password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        required
+        autoComplete="new-password"
+      />
       <Alert type="error">{error}</Alert>
       <Button type="submit" block disabled={submitting}>
         {submitting ? 'Creating account…' : 'Create my account'}

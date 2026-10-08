@@ -5,7 +5,7 @@ import { getErrorMessage } from '../api/client';
 import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Field } from '../components/ui/Field';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
 import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT, PASSWORD_MISMATCH } from '../utils/limits';
 
@@ -56,12 +56,23 @@ export default function ResetPassword() {
 
   return (
     <Card title="Set a new password" titleLevel={1} onSubmit={handleSubmit}>
-      <Field label="New password" hint={PASSWORD_HINT}>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" autoFocus />
-      </Field>
-      <Field label="Confirm new password">
-        <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
-      </Field>
+      <PasswordInput
+        label="New password"
+        hint={PASSWORD_HINT}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        minLength={MIN_PASSWORD_LENGTH}
+        autoComplete="new-password"
+        autoFocus
+      />
+      <PasswordInput
+        label="Confirm new password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        required
+        autoComplete="new-password"
+      />
       <Alert type="error">{error}</Alert>
       <Button type="submit" block disabled={submitting}>
         {submitting ? 'Saving…' : 'Save new password'}

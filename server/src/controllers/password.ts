@@ -13,6 +13,7 @@ import { deleteUserSessions } from '../session.js'
 import { isProtectedDemoAccount } from '../utils/emails.js'
 
 const FORGOT_PASSWORD_MESSAGE = 'If this email exists, we sent you a link to reset your password.'
+export const DEMO_PASSWORD_LOCKED = 'The password of a demo account cannot be changed.'
 
 // Creates a new reset link and emails it. Only the newest link works:
 // unused older links of the user are deleted.
@@ -30,9 +31,13 @@ async function issuePasswordReset(user: User): Promise<void> {
 // POST /api/auth/forgot-password — the same answer whether the email exists or not.
 export const forgotPassword: RequestHandler = async (req, res) => {
   const { email } = parse(forgotPasswordSchema, req.body)
+  // Shared demo accounts get no reset link, and are told so. Decided from the
+  // address alone (a reserved domain), before the lookup, so the answer still
+  // says nothing about which accounts exist.
+  if (isProtectedDemoAccount(email)) throw new HttpError(403, DEMO_PASSWORD_LOCKED)
+
   const user = await prisma.user.findUnique({ where: { email } })
-  // Shared demo accounts get no reset link (the answer stays the same).
-  if (user?.isActive && !isProtectedDemoAccount(user.email)) {
+  if (user?.isActive) {
     // In the background: waiting for the database writes and the email service would
     // make the answer slower for existing emails and reveal which ones exist.
     issuePasswordReset(user).catch((err: unknown) => console.error('Password reset email failed:', err))
@@ -71,7 +76,7 @@ export const changePassword: RequestHandler = async (req, res) => {
   const { currentPassword, newPassword } = parse(changePasswordSchema, req.body)
   const user = req.user!
   if (isProtectedDemoAccount(user.email)) {
-    throw new HttpError(403, 'The password of a demo account cannot be changed.')
+    throw new HttpError(403, DEMO_PASSWORD_LOCKED)
   }
   if (!(await verifyPassword(currentPassword, user.passwordHash))) {
     throw new HttpError(400, 'Your current password is incorrect.')

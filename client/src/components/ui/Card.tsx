@@ -16,8 +16,10 @@ interface CardProps {
 
 export function Card({ title, titleLevel = 2, description, actions, tone = 'default', onSubmit, role, id, children }: CardProps) {
   const className = `card${tone === 'danger' ? ' card-danger' : ''}`;
+  // Buttons sit centred next to a one-line title; with a description under the
+  // title they stay level with the title instead of the middle of both lines.
   const header = (title || actions) && (
-    <div className="card-header">
+    <div className={`card-header${description ? ' card-header-top' : ''}`}>
       <div>
         {title && (titleLevel === 1 ? <h1 className="card-title">{title}</h1> : <h2 className="card-title">{title}</h2>)}
         {description && <p className="card-description">{description}</p>}

@@ -16,6 +16,7 @@
   --text-muted: #5f6d66;
   --border: #e1e6e3;
   --border-strong: #cbd3ce;
+  --border-control: #839089; /* inputs, selects, secondary buttons: at least 3:1 on every surface (WCAG 1.4.11) */
 
   --primary: #1f4f43;
   --primary-hover: #173c33;
@@ -91,6 +92,7 @@
   --text-muted: #9aaaa2;
   --border: #28342f;
   --border-strong: #3e4d46;
+  --border-control: #66756e;
 
   --primary: #8fc2ad;
   --primary-hover: #a9d3c1;
@@ -672,6 +674,9 @@ code {
 .auth-content {
   width: 100%;
   max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap); /* e.g. the demo accounts card under the login card */
 }
 
 /* ================= Page structure ================= */
@@ -683,9 +688,6 @@ code {
 }
 .page > .btn {
   align-self: flex-start; /* e.g. a back link above the title */
-}
-.page > .btn-tertiary {
-  margin-left: -8px; /* text lines up with the page title */
 }
 
 .page-header {
@@ -736,9 +738,12 @@ code {
 .card-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.card-header-top {
+  align-items: flex-start;
 }
 .card-title {
   font-size: 1.07rem;
@@ -840,12 +845,12 @@ h1.card-title {
 /* Secondary: neutral outline */
 .btn-secondary {
   background: var(--surface);
-  border-color: var(--border-strong);
+  border-color: var(--border-control);
   color: var(--text);
 }
 .btn-secondary:hover:not(:disabled) {
   background: var(--surface-muted);
-  border-color: var(--primary-line);
+  border-color: var(--primary);
   color: var(--primary);
 }
 .btn-secondary.btn-danger {
@@ -866,8 +871,14 @@ h1.card-title {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  padding-left: 8px;
-  padding-right: 8px;
+  /* No side padding: the text lines up with the edge of whatever holds it
+     (page title, fields, table edge). */
+  padding-left: 0;
+  padding-right: 0;
+}
+/* Same distance from a button or field before it as the other buttons have */
+.btn-tertiary:not(:first-child) {
+  margin-left: 8px;
 }
 .btn-tertiary:hover:not(:disabled) {
   color: var(--primary-hover);
@@ -889,7 +900,7 @@ h1.card-title {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   background: var(--surface-muted);
   flex-shrink: 0;
@@ -916,7 +927,7 @@ h1.card-title {
 .segmented button.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border-control);
 }
 
 /* ================= Forms ================= */
@@ -926,7 +937,7 @@ select {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   min-height: var(--control-height);
@@ -938,7 +949,7 @@ select {
 }
 input:hover,
 select:hover {
-  border-color: var(--primary-line);
+  border-color: var(--primary);
 }
 input:focus-visible,
 select:focus-visible {
@@ -968,6 +979,43 @@ input[type='checkbox'] {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+/* Password with a show / hide button inside the field, on the right */
+.password-input {
+  position: relative;
+  display: flex;
+}
+.password-input input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 42px; /* room for the button */
+}
+.password-toggle {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 38px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--ease-fast);
+}
+.password-toggle:hover {
+  color: var(--text);
+}
+.password-toggle:focus-visible {
+  outline-offset: -3px; /* inside the field's border */
+}
+/* Edge draws its own reveal button: hide it so there is only one */
+input::-ms-reveal {
+  display: none;
+}
+
 .field-inline {
   flex: 0 0 auto;
   flex-direction: row;
@@ -982,6 +1030,12 @@ input[type='checkbox'] {
 }
 .form-row .field {
   min-width: 200px;
+}
+
+/* Link under a field, on the right (e.g. "Forgot password?") */
+.field-aside {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .form-actions {
@@ -1316,12 +1370,6 @@ input[type='checkbox'] {
 .hours-sep {
   color: var(--text-muted);
 }
-.day-row-body .btn-tertiary {
-  margin-left: -8px; /* underlined text lines up with the inputs */
-}
-.hours-row .btn-tertiary {
-  margin-left: 0;
-}
 
 @media (max-width: 600px) {
   .day-list {
@@ -1413,7 +1461,7 @@ input[type='checkbox'] {
   gap: 1px;
   min-width: 0;
   padding: 10px 4px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
@@ -1503,7 +1551,7 @@ input[type='checkbox'] {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   min-height: 42px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);

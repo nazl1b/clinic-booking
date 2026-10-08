@@ -5,6 +5,7 @@ import { createToken } from '../src/services/tokens.js'
 import { app, createUser, loginAs, outbox, PASSWORD, prisma, request } from './helpers.js'
 
 const FORGOT_MESSAGE = 'If this email exists, we sent you a link to reset your password.'
+const DEMO_LOCKED = 'The password of a demo account cannot be changed.'
 
 describe('demo accounts on the public demo (PROTECT_DEMO_ACCOUNTS=true)', () => {
   beforeAll(() => {
@@ -20,19 +21,37 @@ describe('demo accounts on the public demo (PROTECT_DEMO_ACCOUNTS=true)', () => 
 
     const res = await agent.patch('/api/auth/password').send({ currentPassword: PASSWORD, newPassword: 'brand-new-pass-1' })
     expect(res.status).toBe(403)
-    expect(res.body.error).toBe('The password of a demo account cannot be changed.')
+    expect(res.body.error).toBe(DEMO_LOCKED)
     await loginAs(demo.email) // the old password still works
   })
 
-  it('get no reset link, with the usual answer', async () => {
+  it('get no reset link, and are told why', async () => {
     const demo = await createUser({ role: 'doctor', email: 'demo.doctor@clinic.test' })
 
     const res = await request(app).post('/api/auth/forgot-password').send({ email: demo.email })
-    expect(res.status).toBe(200)
-    expect(res.body.message).toBe(FORGOT_MESSAGE)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe(DEMO_LOCKED)
     await new Promise((resolve) => setTimeout(resolve, 1000))
     expect(outbox.some((e) => e.to === demo.email)).toBe(false)
     expect(await prisma.passwordReset.count({ where: { userId: demo.id } })).toBe(0)
+  })
+
+  it('the demo answer does not reveal which accounts exist', async () => {
+    // Decided from the reserved domain alone: an address without an account gets the same answer.
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'nobody.here@example.net' })
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe(DEMO_LOCKED)
+  })
+
+  it('other emails still get the usual answer', async () => {
+    const real = await createUser({ role: 'patient', email: 'forgetful.person@gmail.com' })
+
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: real.email })
+    expect(res.status).toBe(200)
+    expect(res.body.message).toBe(FORGOT_MESSAGE)
+    const unknown = await request(app).post('/api/auth/forgot-password').send({ email: 'no.account@gmail.com' })
+    expect(unknown.status).toBe(200)
+    expect(unknown.body.message).toBe(FORGOT_MESSAGE)
   })
 
   it('cannot use a reset link made before', async () => {

@@ -15,6 +15,7 @@ export function toUserJson(user: User) {
     email: user.email,
     role: user.role,
     specialty: user.specialty,
+    bio: user.bio, // doctors only
     isActive: user.isActive,
   }
 }

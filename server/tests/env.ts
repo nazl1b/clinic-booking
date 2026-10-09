@@ -23,7 +23,10 @@ export function loadTestEnv(): void {
     process.env[name] = test[name]
   }
   // Session secret, time zone, app URL… from .env; never overrides the test database.
+  // PROTECT_DEMO_ACCOUNTS is left out: test users have reserved emails, so it would
+  // lock their passwords; demoAccounts.test.ts switches it on by itself.
   for (const [name, value] of Object.entries(dev)) {
+    if (name === 'PROTECT_DEMO_ACCOUNTS') continue
     if (process.env[name] === undefined && value !== undefined) process.env[name] = value
   }
   process.env.CLINIC_TIMEZONE ||= 'Europe/Athens'

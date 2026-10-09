@@ -55,8 +55,8 @@ export const updateDoctor: RequestHandler = async (req, res) => {
     return
   }
 
-  const { name, specialty } = parse(doctorDetailsSchema, req.body)
-  res.json(toDoctorJson(await prisma.user.update({ where: { id: doctor.id }, data: { name, specialty } })))
+  const { name, specialty, bio } = parse(doctorDetailsSchema, req.body)
+  res.json(toDoctorJson(await prisma.user.update({ where: { id: doctor.id }, data: { name, specialty, bio } })))
 }
 
 // ---------- appointments ----------

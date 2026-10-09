@@ -8,6 +8,7 @@ export function toDoctorJson(user: User) {
     name: user.name,
     email: user.email,
     specialty: user.specialty ?? '',
+    bio: user.bio, // null = no bio
     isActive: user.isActive,
   }
 }

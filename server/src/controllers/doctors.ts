@@ -13,6 +13,15 @@ export const listDoctors: RequestHandler = async (_req, res) => {
   res.json(doctors.map(toDoctorJson))
 }
 
+// GET /api/doctors/:id — patients; one active doctor for their profile page.
+// A deactivated doctor is a 404, like one that does not exist.
+export const getDoctor: RequestHandler = async (req, res) => {
+  const doctorId = parseId(req.params.id, 'Doctor not found.')
+  const doctor = await prisma.user.findFirst({ where: { id: doctorId, role: 'doctor', isActive: true } })
+  if (!doctor) throw new HttpError(404, 'Doctor not found.')
+  res.json(toDoctorJson(doctor))
+}
+
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD — any logged-in role.
 // Patients: active doctors only (deactivated → 404, like a doctor that does not exist).
 // Doctors: their own slots only (another doctor → 403).

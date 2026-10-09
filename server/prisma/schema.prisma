@@ -44,6 +44,7 @@ model User {
   passwordHash String  @map("password_hash")
   role         Role
   specialty    String? // doctors only
+  bio          String? // doctors only: short text for patients (max length in src/schemas/common.ts)
   isActive     Boolean @default(true) @map("is_active")
 
   availability        Availability[]

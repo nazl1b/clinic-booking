@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { emailSchema, newPasswordSchema } from './auth.js'
+import { bioSchema } from './common.js'
 
 const INVITE = 'Please fill in name, specialty and a valid email.'
 
@@ -18,11 +19,12 @@ export const acceptInvitationSchema = z.object({ password: newPasswordSchema }, 
 
 const DETAILS = 'Name and specialty are required.'
 
-// PATCH /api/admin/doctors/:id with { name, specialty }
+// PATCH /api/admin/doctors/:id with { name, specialty, bio? } — without bio, the bio stays as it is.
 export const doctorDetailsSchema = z.object(
   {
     name: z.string(DETAILS).trim().min(1, DETAILS).max(100, 'Name is too long.'),
     specialty: z.string(DETAILS).trim().min(1, DETAILS).max(100, 'Specialty is too long.'),
+    bio: bioSchema.optional(),
   },
   { error: DETAILS },
 )

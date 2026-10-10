@@ -5,12 +5,14 @@ import type { RequestHandler } from 'express'
 import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
 import { type Invitation, Prisma } from '../generated/prisma/client.js'
-import { acceptInvitationSchema, invitationSchema } from '../schemas/admin.js'
+import { acceptInvitationSchema, invitationListSchema, invitationSchema } from '../schemas/admin.js'
+import { DEFAULT_PAGE_SIZE } from '../schemas/common.js'
 import { parse, parseId } from '../schemas/validate.js'
 import { sendEmail } from '../services/email.js'
 import { INVITATION_HOURS, invitationEmail } from '../services/emailTemplates.js'
 import { hashPassword } from '../services/passwords.js'
 import { createToken, hashToken } from '../services/tokens.js'
+import { escapeLike } from '../utils/search.js'
 
 const INVITATION_NOT_FOUND = 'Invitation not found.'
 const INVALID_LINK = 'This invitation is invalid, has expired or has already been used.'
@@ -64,10 +66,31 @@ export const createInvitation: RequestHandler = async (req, res) => {
   res.status(201).json(toInvitationJson(invitation))
 }
 
-// GET — invitations not used yet, expired ones included so they can be resent.
-export const listInvitations: RequestHandler = async (_req, res) => {
-  const invitations = await prisma.invitation.findMany({ where: { usedAt: null }, orderBy: { id: 'asc' } })
-  res.json(invitations.map(toInvitationJson))
+// GET ?search=&page=&pageSize= — invitations not used yet, expired ones included so
+// they can be resent; oldest first. One page (20 by default) and the total.
+export const listInvitations: RequestHandler = async (req, res) => {
+  const query = parse(invitationListSchema, req.query)
+  const page = query.page ?? 1
+  const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE
+
+  const filters: Prisma.InvitationWhereInput[] = [{ usedAt: null }]
+  if (query.search) {
+    const text = escapeLike(query.search)
+    filters.push({
+      OR: [
+        { name: { contains: text, mode: 'insensitive' } },
+        { specialty: { contains: text, mode: 'insensitive' } },
+        { email: { contains: text, mode: 'insensitive' } },
+      ],
+    })
+  }
+  const where: Prisma.InvitationWhereInput = { AND: filters }
+
+  const [total, invitations] = await prisma.$transaction([
+    prisma.invitation.count({ where }),
+    prisma.invitation.findMany({ where, orderBy: { id: 'asc' }, skip: (page - 1) * pageSize, take: pageSize }),
+  ])
+  res.json({ items: invitations.map(toInvitationJson), page, pageSize, total })
 }
 
 // POST /:id/resend — a new link valid for another 48 hours; the old link stops working.

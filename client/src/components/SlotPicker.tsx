@@ -8,10 +8,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
-import { addDays, clinicToday, daysBetween, formatDate, formatWeekday, groupByDayPart } from '../utils/dates';
-import { Icon } from './layout/Icon';
+import { addDays, clinicToday, formatDate, groupByDayPart, weekStartFor } from '../utils/dates';
+import { DayStrip } from './DayStrip';
 import { Alert } from './ui/Alert';
-import { Button } from './ui/Button';
 import { Muted } from './ui/PageHeader';
 
 interface SlotPickerProps {
@@ -27,8 +26,7 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
   const groupId = useId();
   const today = clinicToday();
   // The seven days shown: today + 0, 7, 14… days, whichever block holds `date`.
-  const weekStart = addDays(today, Math.floor(Math.max(0, daysBetween(today, date)) / 7) * 7);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekStart = weekStartFor(date < today ? today : date, today);
 
   // The result remembers which request it belongs to; while it does not match
   // the current one, the week is still loading.
@@ -52,7 +50,7 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
 
   // Once per doctor and seven days (opening the page, changing week or doctor):
   // select the first day with free times. Not after a reload (reloadKey), and not
-  // when a time is already chosen (e.g. "+ Add" on a free time). If no day has
+  // when a time is already chosen. If no day has
   // times, the first day stays selected. A layout effect, so the empty first day
   // never flashes on screen.
   const weekKey = `${doctorId}|${weekStart}`;
@@ -81,39 +79,18 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
 
   return (
     <div className="stack-sm">
-      <div className="week-picker-head">
-        <Button variant="secondary" size="sm" onClick={() => moveWeek(-1)} disabled={weekStart <= today} aria-label="Previous 7 days">
-          <Icon name="chevronLeft" size={16} />
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => moveWeek(1)} aria-label="Next 7 days">
-          <Icon name="chevronRight" size={16} />
-        </Button>
-        <strong className="week-picker-label">
-          {formatDate(weekStart)} – {formatDate(addDays(weekStart, 6))}
-        </strong>
-      </div>
-
-      <div className="day-strip" role="group" aria-label="Day">
-        {days.map((day) => {
+      <DayStrip
+        weekStart={weekStart}
+        selected={date}
+        onSelect={pickDay}
+        onMoveWeek={moveWeek}
+        canGoBack={weekStart > today}
+        loading={loading}
+        statusOf={(day) => {
           const count = slotsByDate[day]?.length ?? 0;
-          const status = loading ? '…' : count > 0 ? `${count} free` : 'No times';
-          const classes = ['day-btn', day === date && 'selected', !loading && count === 0 && 'day-btn-empty'].filter(Boolean).join(' ');
-          return (
-            <button
-              key={day}
-              type="button"
-              className={classes}
-              aria-pressed={day === date}
-              aria-label={`${formatDate(day)}, ${loading ? 'loading' : status}`}
-              onClick={() => pickDay(day)}
-            >
-              <span className="day-btn-weekday">{day === today ? 'Today' : formatWeekday(day)}</span>
-              <span className="day-btn-number">{Number(day.slice(8, 10))}</span>
-              <span className="day-btn-free">{status}</span>
-            </button>
-          );
-        })}
-      </div>
+          return { label: count > 0 ? `${count} free` : 'No times', empty: count === 0 };
+        }}
+      />
 
       <Alert type="error">{error}</Alert>
       {loading ? (

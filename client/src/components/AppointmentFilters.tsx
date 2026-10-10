@@ -1,15 +1,14 @@
 // Search box and filters above the doctor's and admin's appointment lists.
 // The values live in the URL (see useAppointmentFilters); typing in the search
-// box updates the URL after a short pause instead of on every key.
+// box updates the URL after a short pause instead of on every key (useSearchDraft).
 
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import type { AppointmentFilters as Filters } from '../hooks/useAppointmentFilters';
+import { useSearchDraft } from '../hooks/useSearchDraft';
 import type { Doctor } from '../types';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
 import { SearchInput } from './ui/SearchInput';
-
-const SEARCH_DELAY_MS = 300;
 
 interface AppointmentFiltersProps {
   filters: Filters;
@@ -20,21 +19,8 @@ interface AppointmentFiltersProps {
 }
 
 export function AppointmentFilters({ filters, onChange, onClear, isFiltered, doctors }: AppointmentFiltersProps) {
-  const [search, setSearch] = useState(filters.search);
-
-  // Follow the URL when it changes from outside (Clear filters, Back button).
-  const [urlSearch, setUrlSearch] = useState(filters.search);
-  if (filters.search !== urlSearch) {
-    setUrlSearch(filters.search);
-    setSearch(filters.search);
-  }
-
-  useEffect(() => {
-    if (search.trim() === filters.search.trim()) return;
-    // replace: typing should not add one history entry per search
-    const timer = setTimeout(() => onChange({ search }, { replace: true }), SEARCH_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [search, filters.search, onChange]);
+  const commitSearch = useCallback((search: string) => onChange({ search }, { replace: true }), [onChange]);
+  const [search, setSearch] = useSearchDraft(filters.search, commitSearch);
 
   return (
     <div className="toolbar filters" role="search">

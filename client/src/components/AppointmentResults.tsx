@@ -25,10 +25,12 @@ export function AppointmentResults({ page, busy, isFiltered, onClear, showDoctor
 
   return (
     <div className={`results${busy ? ' results-busy' : ''}`} aria-busy={busy}>
-      <Muted>
-        {plural(page.total, 'appointment')}
-        {isFiltered ? ` ${page.total === 1 ? 'matches' : 'match'} these filters` : ' from today on'}
-      </Muted>
+      {page.items.length > 0 && (
+        <Muted>
+          {plural(page.total, 'appointment')}
+          {isFiltered ? ` ${page.total === 1 ? 'matches' : 'match'} these filters` : ' from today on'}
+        </Muted>
+      )}
       <AppointmentTable
         appointments={page.items}
         showDoctor={showDoctor}

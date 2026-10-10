@@ -70,6 +70,21 @@ export interface AppointmentQuery {
 // yet) and past (past or cancelled).
 export type MyAppointmentsView = 'upcoming' | 'past';
 
+// Search, filter and page of the admin's doctor list, e.g. ?search=cardio&status=active&page=2
+export interface DoctorQuery {
+  search?: string; // name, specialty or email
+  status?: 'active' | 'deactivated';
+  page?: number; // 1-based
+  pageSize?: number; // default 20, at most 100
+}
+
+// Search and page of the admin's pending invitations.
+export interface InvitationQuery {
+  search?: string; // name, specialty or email
+  page?: number;
+  pageSize?: number;
+}
+
 // One page of a list plus the number of matching rows in total.
 export interface Page<T> {
   items: T[];

@@ -1,32 +1,42 @@
-// The doctor's day: the appointments with the free times between them
-// (?date=2026-10-06). Searching and filtering all appointments is on the
-// Appointments page (/doctor/appointments).
+// The doctor's day (?date=2026-10-06): its appointments and blocked times; the
+// number of free times is in the counter above them. A strip of seven days shows
+// how many active appointments each day has; its arrows move 7 days, also into the past.
+// New appointments and blocks are made on their own page (/doctor/schedule/new).
+// Searching and filtering all appointments is on the Appointments page (/doctor/appointments).
 
 import { useEffect, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
-import { cancelDoctorAppointment, createDoctorAppointment, getDoctorDay } from '../api/doctor';
+import { cancelDoctorAppointment, getDoctorActiveAppointments, getDoctorDay } from '../api/doctor';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
 import { AppointmentTable } from '../components/AppointmentTable';
-import { DayNav } from '../components/DayNav';
-import { StaffAppointmentForm } from '../components/StaffAppointmentForm';
+import { DayStrip } from '../components/DayStrip';
 import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
+import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useStaffCancel } from '../hooks/useStaffCancel';
-import type { Appointment, StaffAppointmentInput } from '../types';
-import { clinicToday, isIsoDate } from '../utils/dates';
+import type { Appointment } from '../types';
+import { addDays, clinicToday, isIsoDate, weekStartFor } from '../utils/dates';
 import { plural } from '../utils/text';
+import type { NewStaffAppointmentState } from './NewStaffAppointment';
+
+// Active appointments with a patient (blocked time does not count).
+const isActiveVisit = (a: Appointment) => a.status === 'active' && a.kind !== 'block';
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
   const doctorId = user?.id;
+  const navigate = useNavigate();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const dateParam = params.get('date') ?? '';
-  const date = isIsoDate(dateParam) ? dateParam : clinicToday();
+  const today = clinicToday();
+  const date = isIsoDate(dateParam) ? dateParam : today;
+  const weekStart = weekStartFor(date, today);
+  const weekEnd = addDays(weekStart, 6);
 
   // The result remembers which request it belongs to; while that differs from
   // the current request, a newer day is on its way (the old one stays visible, dimmed).
@@ -37,8 +47,11 @@ export default function DoctorSchedule() {
   // Like `day`, a load error belongs to one request: another day starts clean.
   const [loadError, setLoadError] = useState<{ key: string; message: string } | null>(null);
   const dayError = loadError?.key === dayKey ? loadError.message : '';
-  const [showForm, setShowForm] = useState(false);
-  const [formStart, setFormStart] = useState<{ date: string; slot: FreeSlot } | null>(null); // from "+ Add"
+
+  // Active appointments per day of the seven shown, for the strip.
+  const weekKey = `${doctorId}|${weekStart}|${reloadKey}`;
+  const [week, setWeek] = useState<{ key: string; counts: Record<string, number> } | null>(null);
+  const weekLoading = week?.key !== weekKey;
 
   const reload = () => setReloadKey((k) => k + 1);
   const { handleCancel, cancellingId } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
@@ -55,6 +68,23 @@ export default function DoctorSchedule() {
       ignore = true;
     };
   }, [listView, date, doctorId, dayKey]);
+
+  // The counts of the seven days. If they fail, the strip shows no counts; the day itself still loads.
+  useEffect(() => {
+    if (listView || doctorId === undefined) return;
+    let ignore = false;
+    getDoctorActiveAppointments(weekStart, weekEnd)
+      .then((appointments) => {
+        if (ignore) return;
+        const counts: Record<string, number> = {};
+        for (const a of appointments.filter(isActiveVisit)) counts[a.date] = (counts[a.date] ?? 0) + 1;
+        setWeek({ key: weekKey, counts });
+      })
+      .catch(() => !ignore && setWeek({ key: weekKey, counts: {} }));
+    return () => {
+      ignore = true;
+    };
+  }, [listView, doctorId, weekStart, weekEnd, weekKey]);
 
   // Old links to the list view (?view=list&…) moved to the Appointments page.
   if (listView) {
@@ -74,47 +104,50 @@ export default function DoctorSchedule() {
     });
   }
 
-  function openForm(start: { date: string; slot: FreeSlot } | null) {
-    setFormStart(start);
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // the form opens above the schedule
+  // The form has its own page; it comes back to this day afterwards.
+  function openForm() {
+    const state: NewStaffAppointmentState = { from: location.pathname + location.search };
+    navigate('/doctor/schedule/new', { state });
   }
 
-  async function handleCreate(input: StaffAppointmentInput) {
-    await createDoctorAppointment(input);
-    reload();
-  }
-
-  const active = (day?.appointments ?? []).filter((a) => a.status === 'active' && a.kind !== 'block').length;
+  const active = (day?.appointments ?? []).filter(isActiveVisit).length;
+  const isEmptyDay = day !== null && day.appointments.length === 0; // no appointments or blocks
+  const todayShown = today >= weekStart && today <= weekEnd;
 
   return (
     <div className="page">
       <PageHeader
         title="My schedule"
         actions={
-          !showForm && (
-            <Button variant="secondary" onClick={() => openForm(null)}>
-              Phone appointment / block time
-            </Button>
-          )
+          <Button variant="secondary" onClick={openForm}>
+            Phone appointment / block time
+          </Button>
         }
       />
 
-      {/* The key restarts the form when "+ Add" is used on another free time */}
-      {showForm && user && (
-        <StaffAppointmentForm
-          key={formStart ? `${formStart.date}|${formStart.slot.time}` : 'new'}
-          doctorId={user.id}
-          initialDate={formStart?.date}
-          initialSlot={formStart?.slot}
-          onSubmit={handleCreate}
-          onClose={() => setShowForm(false)}
-        />
-      )}
-
       <Card>
-        <div className="toolbar">
-          <DayNav date={date} onChange={setDate} />
+        <div className="stack-sm">
+          <DayStrip
+            weekStart={weekStart}
+            selected={date}
+            onSelect={setDate}
+            onMoveWeek={(weeks) => setDate(addDays(weekStart, weeks * 7))}
+            loading={weekLoading}
+            statusOf={(d) => {
+              const count = week?.counts[d] ?? 0;
+              return { label: count > 0 ? `${count} appt${count === 1 ? '' : 's'}` : 'None', description: plural(count, 'active appointment'), empty: count === 0 };
+            }}
+            actions={
+              <>
+                {!todayShown && (
+                  <ButtonLink to="/doctor/schedule" variant="tertiary" size="sm">
+                    Back to today
+                  </ButtonLink>
+                )}
+                <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Go to date" />
+              </>
+            }
+          />
         </div>
 
         <Alert type="error">{dayError}</Alert>
@@ -123,18 +156,18 @@ export default function DoctorSchedule() {
           <Muted>Loading…</Muted>
         ) : (
           <div className={`results${busy ? ' results-busy' : ''}`} aria-busy={busy}>
-            <Muted>
-              {plural(active, 'active appointment')} · {plural(day.freeSlots.length, 'free time')}
-            </Muted>
+            {!isEmptyDay && (
+              <Muted>
+                {plural(active, 'active appointment')} · {plural(day.freeSlots.length, 'free time')}
+              </Muted>
+            )}
             <AppointmentTable
               appointments={day.appointments}
               showPatient
               showDate={false}
               onCancel={handleCancel}
               cancellingId={cancellingId}
-              freeSlots={day.freeSlots}
-              onAddAt={(slot) => openForm({ date, slot })}
-              empty={<EmptyState icon="calendar" title="No appointments on this day" text="There are no bookings or free times on this day." />}
+              empty={<EmptyState icon="calendar" title="No appointments on this day" text="There are no bookings or blocked times on this day." />}
             />
           </div>
         )}

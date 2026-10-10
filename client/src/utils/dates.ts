@@ -48,6 +48,12 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((toUtcDate(to).getTime() - toUtcDate(from).getTime()) / 86_400_000);
 }
 
+// First of the seven days (DayStrip) that hold `date`, counted in blocks of 7
+// from today, also backwards: today + 0, ±7, ±14… days.
+export function weekStartFor(date: string, today = clinicToday()): string {
+  return addDays(today, Math.floor(daysBetween(today, date) / 7) * 7);
+}
+
 // 0 = Sunday … 6 = Saturday
 export function dayOfWeek(date: string): number {
   return toUtcDate(date).getUTCDay();

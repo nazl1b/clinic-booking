@@ -2,9 +2,11 @@
 // and one page, all done in the database.
 import { prisma } from '../db.js'
 import type { Prisma } from '../generated/prisma/client.js'
-import { type AppointmentListQuery, DEFAULT_PAGE_SIZE, MY_PAGE_SIZE, type MyAppointmentsQuery } from '../schemas/appointments.js'
+import { type AppointmentListQuery, MY_PAGE_SIZE, type MyAppointmentsQuery } from '../schemas/appointments.js'
+import { DEFAULT_PAGE_SIZE } from '../schemas/common.js'
 import { appointmentInclude, toAppointmentJson } from '../serializers.js'
 import { dateToDb } from '../utils/dates.js'
+import { escapeLike } from '../utils/search.js'
 import { upcomingWhere } from './appointments.js'
 
 // One page of the appointments that match `where`, plus how many match in total.
@@ -21,12 +23,6 @@ async function findPage(where: Prisma.AppointmentWhereInput, direction: Prisma.S
     }),
   ])
   return { items: rows.map(toAppointmentJson), page, pageSize, total }
-}
-
-// Prisma's `contains` becomes LIKE '%…%' without escaping, so "%" or "_" typed
-// by the user would match everything. Backslash is LIKE's escape character in Postgres.
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
 
 // Patient name or email (online), guest name or phone (manual).

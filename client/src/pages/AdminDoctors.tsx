@@ -1,8 +1,8 @@
-import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import {
   cancelInvitation,
   deactivateDoctor,
-  getAllDoctors,
+  getDoctorsPage,
   getInvitations,
   getUpcomingCount,
   inviteDoctor,
@@ -11,6 +11,7 @@ import {
   updateDoctor,
 } from '../api/admin';
 import { getErrorMessage } from '../api/client';
+import { ListToolbar } from '../components/ListToolbar';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -18,9 +19,11 @@ import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Field, FormActions, FormRow } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
+import { Pagination } from '../components/ui/Pagination';
 import { ActionsCell, Table } from '../components/ui/Table';
 import { useConfirm } from '../hooks/useConfirm';
 import { useFieldErrors } from '../hooks/useFieldErrors';
+import { type ListFilters, usePagedList } from '../hooks/usePagedList';
 import { useToast } from '../hooks/useToast';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
@@ -28,13 +31,28 @@ import { BIO_MAX_LENGTH, INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH
 import { plural } from '../utils/text';
 import { checkEmail, required } from '../utils/validation';
 
+// Both lists are searched and paged by the server; their search, filter and page
+// are in the URL (?invitationsSearch=…&invitationsPage=2&doctorsSearch=…&doctorsStatus=active&doctorsPage=3).
+const INVITATION_FILTERS = ['search'] as const;
+const DOCTOR_FILTERS = ['search', 'status'] as const;
+const INVITATIONS_PAGE_SIZE = 10; // a shorter list above the doctors
+
+async function fetchInvitations(filters: ListFilters<'search'>, page: number) {
+  const result = await getInvitations({ search: filters.search || undefined, page, pageSize: INVITATIONS_PAGE_SIZE });
+  const now = Date.now();
+  return { ...result, items: result.items.map((i) => ({ ...i, expired: new Date(i.expiresAt).getTime() < now })) };
+}
+
+function fetchDoctors(filters: ListFilters<'search' | 'status'>, page: number) {
+  const status = filters.status === 'active' || filters.status === 'deactivated' ? filters.status : undefined;
+  return getDoctorsPage({ search: filters.search || undefined, status, page });
+}
+
 export default function AdminDoctors() {
   const confirm = useConfirm();
   const toast = useToast();
-  // Both lists are null until loaded; loadError replaces them when loading fails.
-  const [doctors, setDoctors] = useState<Doctor[] | null>(null);
-  const [invitations, setInvitations] = useState<(Invitation & { expired: boolean })[] | null>(null);
-  const [loadError, setLoadError] = useState('');
+  const invitationList = usePagedList('invitations', INVITATION_FILTERS, fetchInvitations);
+  const doctorList = usePagedList('doctors', DOCTOR_FILTERS, fetchDoctors);
   const [busyId, setBusyId] = useState<string | null>(null); // e.g. "invite-3", "doctor-2"
 
   // Invite form
@@ -55,18 +73,11 @@ export default function AdminDoctors() {
   // Deactivation: phone appointments the admin has to call (shown until closed)
   const [deactivationResult, setDeactivationResult] = useState<(DeactivationResult & { doctorName: string }) | null>(null);
 
-  const load = useCallback(() => {
-    Promise.all([getAllDoctors(), getInvitations()])
-      .then(([doctorList, invitationList]) => {
-        setDoctors(doctorList);
-        const now = Date.now();
-        setInvitations(invitationList.map((i) => ({ ...i, expired: new Date(i.expiresAt).getTime() < now })));
-        setLoadError('');
-      })
-      .catch((err) => setLoadError(getErrorMessage(err)));
-  }, []);
-
-  useEffect(load, [load]);
+  // After an action: both lists, since e.g. an accepted invitation becomes a doctor.
+  function load() {
+    invitationList.reload();
+    doctorList.reload();
+  }
 
   // Runs an action, shows its success or error as a toast, then reloads the lists.
   // Returns true on success.
@@ -190,8 +201,6 @@ export default function AdminDoctors() {
         description="Invite doctors, edit their details or deactivate them."
         actions={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite doctor</Button>}
       />
-      <Alert type="error">{loadError}</Alert>
-
       {deactivationResult && (
         <Card
           title={`${deactivationResult.doctorName} was deactivated`}
@@ -248,126 +257,181 @@ export default function AdminDoctors() {
         </Card>
       )}
 
-      {!loadError && (
-        <Card title="Pending invitations">
-          {!invitations ? (
-            <Muted>Loading…</Muted>
-          ) : invitations.length === 0 ? (
-            <EmptyState icon="user" title="No pending invitations" text="Invitations you send are listed here until the doctor accepts them." />
-          ) : (
-            <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Expires' }, { label: 'Actions', align: 'right', hidden: true }]}>
-              {invitations.map((inv) => {
-                const busy = busyId === `invite-${inv.id}`;
-                return (
-                  <tr key={inv.id}>
-                    <td>{inv.name}</td>
-                    <td>{inv.specialty}</td>
-                    <td>{inv.email}</td>
-                    <td className="nowrap">{inv.expired ? <Badge tone="danger">Expired</Badge> : formatTimestamp(inv.expiresAt)}</td>
-                    <ActionsCell>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => run(`invite-${inv.id}`, () => resendInvitation(inv.id), `New link sent to ${inv.email}. The old link no longer works.`)}
-                      >
-                        Resend
-                      </Button>
-                      <Button
-                        variant="tertiary"
-                        size="sm"
-                        danger
-                        disabled={busy}
-                        onClick={() => askCancelInvitation(inv)}
-                      >
-                        Cancel
-                      </Button>
-                    </ActionsCell>
-                  </tr>
-                );
-              })}
-            </Table>
-          )}
-        </Card>
-
-      )}
-
-      {!loadError && (
-        <Card title="All doctors">
-          {!doctors ? (
-            <Muted>Loading…</Muted>
-          ) : doctors.length === 0 ? (
-            <EmptyState
-              icon="users"
-              title="No doctors yet"
-              text="Invite a doctor to get started."
-              action={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite a doctor</Button>}
-            />
-          ) : (
-            <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Status' }, { label: 'Actions', align: 'right', hidden: true }]}>
-              {doctors.map((doctor) => {
-                const busy = busyId === `doctor-${doctor.id}`;
-                const editing = editingId === doctor.id;
-                const rowClass = [!doctor.isActive && 'row-muted', editing && 'row-editing'].filter(Boolean).join(' ') || undefined;
-                return (
-                  <Fragment key={doctor.id}>
-                    <tr className={rowClass}>
-                      <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
-                      <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
-                      <td>{doctor.email}</td>
-                      <td>
-                        <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
-                      </td>
+      <Card title="Pending invitations">
+        <ListToolbar
+          searchLabel="Search invitations"
+          placeholder="Search name, specialty or email"
+          search={invitationList.filters.search}
+          onChange={invitationList.update}
+          isFiltered={invitationList.isFiltered}
+          onClear={invitationList.clear}
+        />
+        <Alert type="error">{invitationList.error}</Alert>
+        {invitationList.error ? null : !invitationList.page ? (
+          <Muted>Loading…</Muted>
+        ) : (
+          <div className={`results${invitationList.busy ? ' results-busy' : ''}`} aria-busy={invitationList.busy}>
+            {invitationList.page.items.length === 0 ? (
+              invitationList.isFiltered ? (
+                <EmptyState
+                  icon="search"
+                  title="No invitations match this search"
+                  text="Try another search or clear it."
+                  action={
+                    <Button variant="secondary" onClick={invitationList.clear}>
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState icon="user" title="No pending invitations" text="Invitations you send are listed here until the doctor accepts them." />
+              )
+            ) : (
+              <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Expires' }, { label: 'Actions', align: 'right', hidden: true }]}>
+                {invitationList.page.items.map((inv) => {
+                  const busy = busyId === `invite-${inv.id}`;
+                  return (
+                    <tr key={inv.id}>
+                      <td>{inv.name}</td>
+                      <td>{inv.specialty}</td>
+                      <td>{inv.email}</td>
+                      <td className="nowrap">{inv.expired ? <Badge tone="danger">Expired</Badge> : formatTimestamp(inv.expiresAt)}</td>
                       <ActionsCell>
-                        {editing ? (
-                          <>
-                            <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
-                              Save
-                            </Button>
-                            <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
-                              Edit
-                            </Button>
-                            {doctor.isActive ? (
-                              <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
-                                Deactivate
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="tertiary"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
-                              >
-                                Reactivate
-                              </Button>
-                            )}
-                          </>
-                        )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => run(`invite-${inv.id}`, () => resendInvitation(inv.id), `New link sent to ${inv.email}. The old link no longer works.`)}
+                        >
+                          Resend
+                        </Button>
+                        <Button
+                          variant="tertiary"
+                          size="sm"
+                          danger
+                          disabled={busy}
+                          onClick={() => askCancelInvitation(inv)}
+                        >
+                          Cancel
+                        </Button>
                       </ActionsCell>
                     </tr>
-                    {/* The bio is longer than a cell: it gets a row of its own while editing */}
-                    {editing && (
-                      <tr className="row-edit">
-                        <td colSpan={5}>
-                          <Field label="Bio" hint={`Shown to patients on the doctor's page. Optional, up to ${BIO_MAX_LENGTH} characters.`}>
-                            <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} maxLength={BIO_MAX_LENGTH} rows={3} />
-                          </Field>
+                  );
+                })}
+              </Table>
+            )}
+            <Pagination page={invitationList.page.page} pageSize={invitationList.page.pageSize} total={invitationList.page.total} onChange={invitationList.setPage} />
+          </div>
+        )}
+      </Card>
+
+      <Card title="All doctors">
+        <ListToolbar
+          searchLabel="Search doctors"
+          placeholder="Search name, specialty or email"
+          search={doctorList.filters.search}
+          onChange={doctorList.update}
+          isFiltered={doctorList.isFiltered}
+          onClear={doctorList.clear}
+        >
+          <select value={doctorList.filters.status} onChange={(e) => doctorList.update({ status: e.target.value })} aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="deactivated">Deactivated</option>
+          </select>
+        </ListToolbar>
+        <Alert type="error">{doctorList.error}</Alert>
+        {doctorList.error ? null : !doctorList.page ? (
+          <Muted>Loading…</Muted>
+        ) : (
+          <div className={`results${doctorList.busy ? ' results-busy' : ''}`} aria-busy={doctorList.busy}>
+            {doctorList.page.items.length === 0 ? (
+              doctorList.isFiltered ? (
+                <EmptyState
+                  icon="search"
+                  title="No doctors match these filters"
+                  text="Try another search or other filters."
+                  action={
+                    <Button variant="secondary" onClick={doctorList.clear}>
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon="users"
+                  title="No doctors yet"
+                  text="Invite a doctor to get started."
+                  action={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite a doctor</Button>}
+                />
+              )
+            ) : (
+              <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Status' }, { label: 'Actions', align: 'right', hidden: true }]}>
+                {doctorList.page.items.map((doctor) => {
+                  const busy = busyId === `doctor-${doctor.id}`;
+                  const editing = editingId === doctor.id;
+                  const rowClass = [!doctor.isActive && 'row-muted', editing && 'row-editing'].filter(Boolean).join(' ') || undefined;
+                  return (
+                    <Fragment key={doctor.id}>
+                      <tr className={rowClass}>
+                        <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
+                        <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
+                        <td>{doctor.email}</td>
+                        <td>
+                          <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
                         </td>
+                        <ActionsCell>
+                          {editing ? (
+                            <>
+                              <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
+                                Save
+                              </Button>
+                              <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
+                                Edit
+                              </Button>
+                              {doctor.isActive ? (
+                                <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
+                                  Deactivate
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="tertiary"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
+                                >
+                                  Reactivate
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </ActionsCell>
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </Table>
-          )}
-        </Card>
-      )}
+                      {/* The bio is longer than a cell: it gets a row of its own while editing */}
+                      {editing && (
+                        <tr className="row-edit">
+                          <td colSpan={5}>
+                            <Field label="Bio" hint={`Shown to patients on the doctor's page. Optional, up to ${BIO_MAX_LENGTH} characters.`}>
+                              <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} maxLength={BIO_MAX_LENGTH} rows={3} />
+                            </Field>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </Table>
+            )}
+            <Pagination page={doctorList.page.page} pageSize={doctorList.page.pageSize} total={doctorList.page.total} onChange={doctorList.setPage} />
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

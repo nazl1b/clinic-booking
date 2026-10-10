@@ -1,11 +1,23 @@
 // Admin endpoints: /api/admin/*
 
-import type { Appointment, AppointmentQuery, DeactivationResult, Doctor, Invitation, Page, StaffAppointmentInput } from '../types';
+import type { Appointment, AppointmentQuery, DeactivationResult, Doctor, DoctorQuery, Invitation, InvitationQuery, Page, StaffAppointmentInput } from '../types';
+import { MAX_PAGE_SIZE } from '../utils/limits';
 import { request, toQueryString } from './client';
 
-// GET /api/admin/doctors — including deactivated ones.
-export function getAllDoctors(): Promise<Doctor[]> {
-  return request('GET', '/admin/doctors');
+// GET /api/admin/doctors?search=&status=&page=&pageSize= — including deactivated
+// ones unless filtered; active first, then by name. Returns one page and the total.
+export function getDoctorsPage(query: DoctorQuery = {}): Promise<Page<Doctor>> {
+  const qs = toQueryString(query);
+  return request('GET', `/admin/doctors${qs ? `?${qs}` : ''}`);
+}
+
+// Every doctor, all pages joined: for the doctor selects (filter, phone appointment form).
+export async function getAllDoctors(): Promise<Doctor[]> {
+  const first = await getDoctorsPage({ page: 1, pageSize: MAX_PAGE_SIZE });
+  const pageCount = Math.ceil(first.total / first.pageSize);
+  if (pageCount <= 1) return first.items;
+  const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => getDoctorsPage({ page: i + 2, pageSize: MAX_PAGE_SIZE })));
+  return [first, ...rest].flatMap((p) => p.items);
 }
 
 // POST /api/admin/invitations — emails the doctor a link to set their own password.
@@ -14,10 +26,11 @@ export function inviteDoctor(input: { name: string; specialty: string; email: st
   return request('POST', '/admin/invitations', { body: input });
 }
 
-// GET /api/admin/invitations — pending (unused) invitations, expired ones included
-// so the admin can resend them.
-export function getInvitations(): Promise<Invitation[]> {
-  return request('GET', '/admin/invitations');
+// GET /api/admin/invitations?search=&page=&pageSize= — pending (unused) invitations,
+// expired ones included so the admin can resend them; oldest first. One page and the total.
+export function getInvitations(query: InvitationQuery = {}): Promise<Page<Invitation>> {
+  const qs = toQueryString(query);
+  return request('GET', `/admin/invitations${qs ? `?${qs}` : ''}`);
 }
 
 // POST /api/admin/invitations/:id/resend — new token, the old link stops working.

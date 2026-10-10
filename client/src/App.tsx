@@ -21,6 +21,7 @@ import Doctors from './pages/Doctors';
 import ForgotPassword from './pages/ForgotPassword';
 import Login from './pages/Login';
 import MyAppointments from './pages/MyAppointments';
+import NewStaffAppointment from './pages/NewStaffAppointment';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -82,12 +83,14 @@ export default function App() {
 
                 {/* Doctor */}
                 <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
+                <Route path="doctor/schedule/new" element={<RequireRole roles={['doctor']}><NewStaffAppointment /></RequireRole>} />
                 <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
                 <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
 
                 {/* Admin */}
                 <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
                 <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
+                <Route path="admin/appointments/new" element={<RequireRole roles={['admin']}><NewStaffAppointment /></RequireRole>} />
               </Route>
 
               <Route element={<NotFoundLayout />}>

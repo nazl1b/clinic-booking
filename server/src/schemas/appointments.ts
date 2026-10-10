@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { VisitReason } from '../generated/prisma/enums.js'
 import { isValidDate } from '../utils/dates.js'
-import { dateSchema, timeSchema } from './common.js'
+import { dateSchema, optionalParam, pageParam, pageSizeParam, searchParam, timeSchema } from './common.js'
 
 // Reason for the visit: required for online and phone appointments, not for blocks.
 // The values are the VisitReason enum of schema.prisma; labels in client/src/utils/reasons.ts.
@@ -71,22 +71,12 @@ export const staffAppointmentSchema = z.discriminatedUnion(
 
 export type StaffAppointmentInput = z.infer<typeof staffAppointmentSchema>
 
-// Empty query params ("?status=") count as not given.
-const optionalParam = <T extends z.ZodType>(schema: T) => z.preprocess((value) => (value === '' ? undefined : value), schema.optional())
-
-export const DEFAULT_PAGE_SIZE = 20
 export const MY_PAGE_SIZE = 10 // the patient's own lists
-const MAX_PAGE_SIZE = 100
-
-const pageParam = optionalParam(z.coerce.number('Invalid page.').int('Invalid page.').min(1, 'Invalid page.'))
-const pageSizeParam = optionalParam(
-  z.coerce.number('Invalid page size.').int('Invalid page size.').min(1, 'Invalid page size.').max(MAX_PAGE_SIZE, 'Invalid page size.'),
-)
 
 // Query of the doctor's and the admin's appointment lists (client/src/types: AppointmentQuery).
 export const appointmentListSchema = z
   .object({
-    search: optionalParam(z.string('Invalid search.').trim().max(100, 'Search is too long.')),
+    search: searchParam,
     status: optionalParam(z.enum(['active', 'cancelled'], 'Invalid status.')),
     kind: optionalParam(z.enum(['online', 'manual', 'block'], 'Invalid type.')),
     from: optionalParam(z.string('Invalid from date.').refine(isValidDate, 'Invalid from date.')),

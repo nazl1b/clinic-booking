@@ -12,17 +12,26 @@ export function getDoctorAppointments(query: AppointmentQuery = {}): Promise<Pag
   return request('GET', `/doctor/appointments${qs ? `?${qs}` : ''}`);
 }
 
-// Every appointment of one day, for the day schedule. A day rarely fills one
+// Every appointment that matches `query`, all pages joined. A day rarely fills one
 // page, but cancelled appointments can pile up on the same times, so the
 // remaining pages are fetched too: the schedule never silently drops rows.
 // The server orders by date, time and id, so the pages join without gaps.
-export async function getDoctorDay(date: string): Promise<Appointment[]> {
-  const query = { from: date, to: date, pageSize: MAX_PAGE_SIZE };
-  const first = await getDoctorAppointments({ ...query, page: 1 });
+async function getAllDoctorAppointments(query: AppointmentQuery): Promise<Appointment[]> {
+  const first = await getDoctorAppointments({ ...query, page: 1, pageSize: MAX_PAGE_SIZE });
   const pageCount = Math.ceil(first.total / first.pageSize);
   if (pageCount <= 1) return first.items;
-  const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => getDoctorAppointments({ ...query, page: i + 2 })));
+  const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => getDoctorAppointments({ ...query, page: i + 2, pageSize: MAX_PAGE_SIZE })));
   return [first, ...rest].flatMap((p) => p.items);
+}
+
+// Every appointment of one day, for the day schedule.
+export function getDoctorDay(date: string): Promise<Appointment[]> {
+  return getAllDoctorAppointments({ from: date, to: date });
+}
+
+// Active appointments (and blocks) from `from` to `to`, for the counts in the schedule's day strip.
+export function getDoctorActiveAppointments(from: string, to: string): Promise<Appointment[]> {
+  return getAllDoctorAppointments({ from, to, status: 'active' });
 }
 
 // PATCH /api/doctor/profile — the doctor's own bio (empty removes it). Returns the updated user.

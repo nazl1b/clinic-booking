@@ -24,10 +24,9 @@ import { Segmented } from './ui/Segmented';
 interface StaffAppointmentFormProps {
   doctorId?: number; // fixed doctor (doctor's own page)
   doctors?: Doctor[]; // admin: choose any active doctor
-  initialDate?: string; // e.g. "+ Add" on a free time in the day schedule
-  initialSlot?: FreeSlot;
   onSubmit: (input: StaffAppointmentInput) => Promise<void>;
-  onClose: () => void;
+  onSaved: () => void; // after the success toast, e.g. back to the schedule
+  onCancel: () => void;
 }
 
 type Kind = StaffAppointmentInput['kind'];
@@ -35,11 +34,11 @@ type Kind = StaffAppointmentInput['kind'];
 // Lengths offered for blocked time, in slots of the doctor's appointment length.
 const BLOCK_LENGTH_OPTIONS = [1, 2, 3, 4, 6, 8];
 
-export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSlot, onSubmit, onClose }: StaffAppointmentFormProps) {
+export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onCancel }: StaffAppointmentFormProps) {
   const [kind, setKind] = useState<Kind>('manual');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(doctorId ?? doctors?.[0]?.id ?? null);
-  const [date, setDate] = useState(initialDate ?? clinicToday());
-  const [slot, setSlot] = useState<FreeSlot | null>(initialSlot ?? null);
+  const [date, setDate] = useState(clinicToday());
+  const [slot, setSlot] = useState<FreeSlot | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [reason, setReason] = useState<VisitReason | ''>('');
@@ -71,27 +70,23 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       if (kind === 'manual') {
         await onSubmit({ ...common, kind, guestName, guestPhone, reason: reason as VisitReason }); // checked above
         toast.success(`Phone appointment for ${guestName} on ${formatDate(date)} at ${slot.time} was booked.`);
-        setGuestName('');
-        setGuestPhone('');
-        setReason('');
       } else {
         await onSubmit({ ...common, kind, durationMinutes: blockSlots * slot.durationMinutes });
         toast.success(`Time blocked on ${formatDate(date)} from ${slot.time}.`);
       }
-      setNote('');
-      setSlot(null);
+      onSaved();
     } catch (err) {
       setError(getErrorMessage(err));
       if (err instanceof ApiError && err.status === 409) setSlot(null);
-    } finally {
+      setReloadKey((k) => k + 1); // the free times may have changed
       setSaving(false);
-      setReloadKey((k) => k + 1);
     }
   }
 
   return (
     <Card
       title="New phone appointment or blocked time"
+      titleLevel={1}
       onSubmit={handleSubmit}
       actions={
         <Segmented
@@ -165,8 +160,8 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
         <Button type="submit" disabled={saving || !slot}>
           {saving ? 'Saving…' : kind === 'manual' ? 'Book phone appointment' : 'Block time'}
         </Button>
-        <Button variant="tertiary" onClick={onClose}>
-          Close
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
         </Button>
       </FormActions>
     </Card>

@@ -346,7 +346,10 @@ code {
   align-items: center;
   gap: 12px;
   height: var(--topbar-height);
-  padding: 0 28px;
+  /* Same side edges as the page content (.content): its side padding, or more once
+     the content reaches its max width and is centred. So the user menu ends exactly
+     where the cards end, on every page and screen size. */
+  padding: 0 max(var(--content-pad-x), calc((100% - var(--content-max)) / 2));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -637,9 +640,6 @@ code {
   .menu-button,
   .sidebar-close {
     display: inline-grid;
-  }
-  .topbar {
-    padding: 0 12px;
   }
   .topbar-brand {
     display: block;
@@ -1514,20 +1514,6 @@ input::-ms-reveal {
 .row-cancelled td:nth-child(2) {
   text-decoration: line-through;
 }
-/* Day schedule: free time between appointments */
-.row-free td {
-  color: var(--text-muted);
-}
-@media (hover: hover) {
-  .row-free .row-actions {
-    opacity: 0;
-    transition: opacity var(--ease-fast);
-  }
-  .row-free:hover .row-actions,
-  .row-free .row-actions:focus-within {
-    opacity: 1;
-  }
-}
 /* Blocked time: hatched, so it reads as "unavailable" at a glance */
 .row-block td,
 .table tbody tr.row-block:hover td {
@@ -1718,6 +1704,7 @@ input::-ms-reveal {
 
 .week-picker-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -1727,6 +1714,19 @@ input::-ms-reveal {
 .week-picker-label {
   margin-left: 8px;
   font-variant-numeric: tabular-nums;
+}
+/* e.g. the schedule's "Back to today" and date input, on the right */
+.week-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.week-picker-actions input {
+  min-height: 34px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .day-strip {

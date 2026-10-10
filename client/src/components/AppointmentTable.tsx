@@ -1,9 +1,7 @@
 // Table of appointments shared by the patient, doctor and admin pages.
-// Columns are switched on/off per page. For a single day it can also list the
-// free times between the appointments, so the whole day is visible at once.
+// Columns are switched on/off per page.
 
 import type { ReactNode } from 'react';
-import type { FreeSlot } from '../api/doctors';
 import type { Appointment } from '../types';
 import { formatDate, fromMinutes, isPast, toMinutes } from '../utils/dates';
 import { VISIT_REASON_LABELS } from '../utils/reasons';
@@ -21,13 +19,9 @@ interface AppointmentTableProps {
   showStatus?: boolean; // default true; off where every row has the same status
   onCancel?: (appointment: Appointment) => void;
   cancellingId?: number | null;
-  freeSlots?: FreeSlot[]; // single-day list only: free times shown between the appointments
-  onAddAt?: (slot: FreeSlot) => void; // "+ Add" on a free time
   empty?: ReactNode; // shown when there is nothing to list, e.g. an EmptyState
   className?: string; // extra class on the table, e.g. fixed column widths
 }
-
-type Row = { kind: 'appointment'; time: string; appointment: Appointment } | { kind: 'free'; time: string; slot: FreeSlot };
 
 function rowClass(a: Appointment, status: { label: string }): string | undefined {
   const classes = [
@@ -85,14 +79,12 @@ export function AppointmentTable({
   showStatus = true,
   onCancel,
   cancellingId,
-  freeSlots = [],
-  onAddAt,
   empty,
   className,
 }: AppointmentTableProps) {
-  if (appointments.length === 0 && freeSlots.length === 0) return empty ?? <Muted>No appointments.</Muted>;
+  if (appointments.length === 0) return empty ?? <Muted>No appointments.</Muted>;
 
-  const hasActions = Boolean(onCancel || onAddAt);
+  const hasActions = Boolean(onCancel);
   const columns: Column[] = [
     ...(showDate ? [{ label: 'Date' }] : []),
     { label: 'Time' },
@@ -103,43 +95,9 @@ export function AppointmentTable({
     ...(showStatus ? [{ label: 'Status' }] : []),
     ...(hasActions ? [{ label: 'Actions', align: 'right' as const, hidden: true }] : []),
   ];
-  // Columns a free-time row spans after the Time column.
-  const freeSpan = (showDoctor ? 1 : 0) + (showPatient ? 1 : 0) + (showType ? 1 : 0) + 1 + (showStatus ? 1 : 0);
-
-  // Free times go between the appointments, by start time. When both start at
-  // the same time (a cancelled appointment freed the slot), the appointment comes first.
-  const rows: Row[] = [
-    ...appointments.map((a): Row => ({ kind: 'appointment', time: a.time, appointment: a })),
-    ...freeSlots.map((s): Row => ({ kind: 'free', time: s.time, slot: s })),
-  ];
-  if (freeSlots.length > 0) rows.sort((x, y) => x.time.localeCompare(y.time) || (x.kind === 'appointment' ? -1 : 1));
-
   return (
     <Table columns={columns} className={className}>
-      {rows.map((row) => {
-        if (row.kind === 'free') {
-          const slot = row.slot;
-          return (
-            <tr key={`free-${slot.time}`} className="row-free">
-              {showDate && <td />}
-              <td className="nowrap tabular">
-                {slot.time}–{fromMinutes(toMinutes(slot.time) + slot.durationMinutes)}
-              </td>
-              <td colSpan={freeSpan}>Available</td>
-              {hasActions && (
-                <ActionsCell>
-                  {onAddAt && (
-                    <Button variant="tertiary" size="sm" onClick={() => onAddAt(slot)} aria-label={`Add an appointment at ${slot.time}`}>
-                      + Add
-                    </Button>
-                  )}
-                </ActionsCell>
-              )}
-            </tr>
-          );
-        }
-
-        const a = row.appointment;
+      {appointments.map((a) => {
         const status = statusOf(a);
         const canCancel = onCancel && status.label === 'Upcoming';
         return (

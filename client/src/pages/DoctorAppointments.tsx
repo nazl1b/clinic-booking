@@ -27,6 +27,7 @@ export default function DoctorAppointments() {
             page={page}
             busy={busy}
             isFiltered={isFiltered}
+            onClear={clear}
             onCancel={handleCancel}
             cancellingId={cancellingId}
             onPageChange={(p) => update({ page: p })}

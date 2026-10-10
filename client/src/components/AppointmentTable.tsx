@@ -2,6 +2,7 @@
 // Columns are switched on/off per page. For a single day it can also list the
 // free times between the appointments, so the whole day is visible at once.
 
+import type { ReactNode } from 'react';
 import type { FreeSlot } from '../api/doctors';
 import type { Appointment } from '../types';
 import { formatDate, fromMinutes, isPast, toMinutes } from '../utils/dates';
@@ -22,7 +23,7 @@ interface AppointmentTableProps {
   cancellingId?: number | null;
   freeSlots?: FreeSlot[]; // single-day list only: free times shown between the appointments
   onAddAt?: (slot: FreeSlot) => void; // "+ Add" on a free time
-  emptyText?: string;
+  empty?: ReactNode; // shown when there is nothing to list, e.g. an EmptyState
   className?: string; // extra class on the table, e.g. fixed column widths
 }
 
@@ -86,10 +87,10 @@ export function AppointmentTable({
   cancellingId,
   freeSlots = [],
   onAddAt,
-  emptyText,
+  empty,
   className,
 }: AppointmentTableProps) {
-  if (appointments.length === 0 && freeSlots.length === 0) return <Muted>{emptyText ?? 'No appointments.'}</Muted>;
+  if (appointments.length === 0 && freeSlots.length === 0) return empty ?? <Muted>No appointments.</Muted>;
 
   const hasActions = Boolean(onCancel || onAddAt);
   const columns: Column[] = [

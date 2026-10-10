@@ -15,6 +15,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Field, FormActions, FormRow } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { ActionsCell, Table } from '../components/ui/Table';
@@ -252,7 +253,7 @@ export default function AdminDoctors() {
           {!invitations ? (
             <Muted>Loading…</Muted>
           ) : invitations.length === 0 ? (
-            <Muted>No pending invitations.</Muted>
+            <EmptyState icon="user" title="No pending invitations" text="Invitations you send are listed here until the doctor accepts them." />
           ) : (
             <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Expires' }, { label: 'Actions', align: 'right', hidden: true }]}>
               {invitations.map((inv) => {
@@ -296,7 +297,12 @@ export default function AdminDoctors() {
           {!doctors ? (
             <Muted>Loading…</Muted>
           ) : doctors.length === 0 ? (
-            <Muted>No doctors yet. Invite a doctor to get started.</Muted>
+            <EmptyState
+              icon="users"
+              title="No doctors yet"
+              text="Invite a doctor to get started."
+              action={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite a doctor</Button>}
+            />
           ) : (
             <Table columns={[{ label: 'Name' }, { label: 'Specialty' }, { label: 'Email' }, { label: 'Status' }, { label: 'Actions', align: 'right', hidden: true }]}>
               {doctors.map((doctor) => {

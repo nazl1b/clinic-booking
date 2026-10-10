@@ -13,6 +13,7 @@ import { StaffAppointmentForm } from '../components/StaffAppointmentForm';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useStaffCancel } from '../hooks/useStaffCancel';
@@ -133,7 +134,7 @@ export default function DoctorSchedule() {
               cancellingId={cancellingId}
               freeSlots={day.freeSlots}
               onAddAt={(slot) => openForm({ date, slot })}
-              emptyText="No appointments on this day."
+              empty={<EmptyState icon="calendar" title="No appointments on this day" text="There are no bookings or free times on this day." />}
             />
           </div>
         )}

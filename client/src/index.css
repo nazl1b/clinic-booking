@@ -1676,6 +1676,38 @@ input::-ms-reveal {
   font-weight: 600;
   font-size: 1.07rem;
 }
+/* ---- Empty state: a whole list with nothing in it (EmptyState) ---- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 16px;
+  text-align: center;
+}
+.empty-state-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.empty-state-title {
+  font-weight: 600;
+}
+.empty-state-text {
+  max-width: 44ch;
+  color: var(--text-muted);
+  font-size: 0.93rem;
+}
+.empty-state-action {
+  margin-top: 10px;
+}
+
 .avatar-sm {
   width: 32px;
   height: 32px;

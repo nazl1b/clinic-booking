@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import { getDoctors } from '../api/doctors';
 import { Alert } from '../components/ui/Alert';
-import { ButtonLink } from '../components/ui/Button';
+import { Button, ButtonLink } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { SearchInput } from '../components/ui/SearchInput';
 import type { Doctor } from '../types';
@@ -46,11 +47,28 @@ export default function Doctors() {
 
       <Alert type="error">{error}</Alert>
       {!doctors && !error && <Muted>Loading doctors…</Muted>}
-      {doctors?.length === 0 && <Muted>There are no doctors to book with yet. Please check again later.</Muted>}
+      {doctors?.length === 0 && <EmptyState icon="users" title="No doctors yet" text="There are no doctors to book with yet. Please check again later." />}
       {doctors && doctors.length > 0 && visible.length === 0 && (
-        <Muted>
-          No doctors match “{search.trim()}”{specialty && ` in ${specialty}`}.
-        </Muted>
+        <EmptyState
+          icon="search"
+          title="No doctors found"
+          text={
+            <>
+              No doctors match “{search.trim()}”{specialty && ` in ${specialty}`}.
+            </>
+          }
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSearch('');
+                setSpecialty('');
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        />
       )}
 
       <div className="doctor-grid">

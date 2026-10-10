@@ -60,6 +60,7 @@ export default function AdminAppointments() {
             page={page}
             busy={busy}
             isFiltered={isFiltered}
+            onClear={clear}
             showDoctor
             onCancel={handleCancel}
             cancellingId={cancellingId}

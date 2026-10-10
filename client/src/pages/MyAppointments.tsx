@@ -8,6 +8,7 @@ import { AppointmentTable } from '../components/AppointmentTable';
 import { Alert } from '../components/ui/Alert';
 import { ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { Pagination } from '../components/ui/Pagination';
 import { useConfirm } from '../hooks/useConfirm';
@@ -73,11 +74,21 @@ export default function MyAppointments() {
           showStatus={false}
           onCancel={handleCancel}
           cancellingId={cancellingId}
-          emptyText="You have no upcoming appointments."
+          empty={
+            <EmptyState
+              icon="calendar"
+              title="You have no upcoming appointments"
+              text="Choose a doctor and a free time to book a visit."
+              action={<ButtonLink to="/doctors">Book appointment</ButtonLink>}
+            />
+          }
         />
       </Card>
       <Card title="Past and cancelled">
-        <MyAppointmentList list={past} emptyText="Nothing here yet." />
+        <MyAppointmentList
+          list={past}
+          empty={<EmptyState icon="clock" title="No past or cancelled appointments" text="Your past and cancelled visits will be listed here." />}
+        />
       </Card>
     </div>
   );

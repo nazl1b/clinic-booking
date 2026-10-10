@@ -71,6 +71,14 @@ export function fromMinutes(minutes: number): string {
 }
 
 // True if the appointment start is already in the past (clinic time).
+// A length of time: "30 min", "1 h", "1 h 30 min".
+export function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
 export function isPast(date: string, time: string): boolean {
   const now = clinicNow();
   return date < now.date || (date === now.date && time <= now.time);

@@ -13,7 +13,7 @@ import { Icon } from '../components/layout/Icon';
 import { StaffAppointmentForm } from '../components/StaffAppointmentForm';
 import { Alert } from '../components/ui/Alert';
 import { ButtonLink } from '../components/ui/Button';
-import { Muted } from '../components/ui/PageHeader';
+import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import type { Doctor, StaffAppointmentInput } from '../types';
 
@@ -65,6 +65,7 @@ export default function NewStaffAppointment() {
   return (
     <div className="page">
       {backLink}
+      <PageHeader title="New phone appointment or blocked time" />
       <StaffAppointmentForm
         doctorId={isAdmin ? undefined : user.id}
         doctors={isAdmin ? (doctors ?? []) : undefined}

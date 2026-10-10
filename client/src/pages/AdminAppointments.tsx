@@ -41,7 +41,7 @@ export default function AdminAppointments() {
       <PageHeader
         title="All appointments"
         actions={
-          <Button variant="secondary" onClick={openForm} disabled={doctors.length === 0}>
+          <Button onClick={openForm} disabled={doctors.length === 0}>
             Phone appointment / block time
           </Button>
         }

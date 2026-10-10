@@ -18,7 +18,7 @@ interface SlotPickerProps {
   date: string;
   onDateChange: (date: string) => void;
   selectedTime: string | null;
-  onSelectTime: (slot: FreeSlot | null) => void;
+  onSelectTime: (slot: FreeSlot | null, daySlots: FreeSlot[]) => void; // daySlots: every free time of that day, by time
   reloadKey?: number; // bump to force a reload, e.g. after a 409
 }
 
@@ -66,7 +66,7 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
   function pickDay(day: string) {
     if (day === date) return;
     onDateChange(day);
-    onSelectTime(null);
+    onSelectTime(null, []);
   }
 
   // Moving 7 days selects the first of the new seven (never before today).
@@ -111,7 +111,7 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
                     type="button"
                     aria-pressed={slot.time === selectedTime}
                     className={`slot${slot.time === selectedTime ? ' selected' : ''}`}
-                    onClick={() => onSelectTime(slot)}
+                    onClick={() => onSelectTime(slot, slots)}
                   >
                     {slot.time}
                   </button>

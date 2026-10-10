@@ -7,10 +7,9 @@ import type { FreeSlot } from '../api/doctors';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
 import type { Doctor, StaffAppointmentInput, VisitReason } from '../types';
-import { clinicToday, formatDate } from '../utils/dates';
+import { clinicToday, formatDate, formatDuration, fromMinutes, toMinutes } from '../utils/dates';
 import { NAME_MAX_LENGTH, NOTE_MAX_LENGTH, PHONE_MAX_LENGTH } from '../utils/limits';
 import { REASON_REQUIRED } from '../utils/reasons';
-import { plural } from '../utils/text';
 import { required } from '../utils/validation';
 import { ReasonSelect } from './ReasonSelect';
 import { SlotPicker } from './SlotPicker';
@@ -34,11 +33,29 @@ type Kind = StaffAppointmentInput['kind'];
 // Lengths offered for blocked time, in slots of the doctor's appointment length.
 const BLOCK_LENGTH_OPTIONS = [1, 2, 3, 4, 6, 8];
 
+// How many free times follow each other from `start` on (itself included), inside
+// the same working window: a block can only cover those. It may not overlap an
+// appointment, and like the server it must stay in one window, even when the next
+// window starts right where this one ends (e.g. 09:00–12:00 and 12:00–14:00).
+function freeSlotsInARow(daySlots: FreeSlot[], start: FreeSlot): number {
+  let count = 0;
+  let next = toMinutes(start.time);
+  for (const s of daySlots) {
+    const time = toMinutes(s.time);
+    if (time < next) continue;
+    if (time !== next || s.windowEnd !== start.windowEnd) break;
+    count++;
+    next += s.durationMinutes;
+  }
+  return count;
+}
+
 export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onCancel }: StaffAppointmentFormProps) {
   const [kind, setKind] = useState<Kind>('manual');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(doctorId ?? doctors?.[0]?.id ?? null);
   const [date, setDate] = useState(clinicToday());
   const [slot, setSlot] = useState<FreeSlot | null>(null);
+  const [daySlots, setDaySlots] = useState<FreeSlot[]>([]); // free times of the chosen day
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [reason, setReason] = useState<VisitReason | ''>('');
@@ -84,11 +101,9 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
   }
 
   return (
-    <Card
-      title="New phone appointment or blocked time"
-      titleLevel={1}
-      onSubmit={handleSubmit}
-      actions={
+    <Card onSubmit={handleSubmit}>
+      {/* The page title is in the page's PageHeader; the type comes first in the form */}
+      <div>
         <Segmented
           label="Type"
           options={[
@@ -98,8 +113,7 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
           value={kind}
           onChange={setKind}
         />
-      }
-    >
+      </div>
       {doctors && (
         <Field label="Doctor">
           <select
@@ -121,7 +135,18 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
       {selectedDoctorId === null ? (
         <Muted>There are no active doctors.</Muted>
       ) : (
-        <SlotPicker doctorId={selectedDoctorId} date={date} onDateChange={setDate} selectedTime={slot?.time ?? null} onSelectTime={setSlot} reloadKey={reloadKey} />
+        <SlotPicker
+          doctorId={selectedDoctorId}
+          date={date}
+          onDateChange={setDate}
+          selectedTime={slot?.time ?? null}
+          onSelectTime={(chosen, free) => {
+            setSlot(chosen);
+            setDaySlots(free);
+            setBlockSlots(1); // always fits; longer ones depend on the new time
+          }}
+          reloadKey={reloadKey}
+        />
       )}
 
       {kind === 'manual' ? (
@@ -140,13 +165,20 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
         </>
       ) : (
         <Field label="Length">
-          <select value={blockSlots} onChange={(e) => setBlockSlots(Number(e.target.value))}>
-            {BLOCK_LENGTH_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {slot ? plural(n * slot.durationMinutes, 'minute') : plural(n, 'slot')}
-              </option>
-            ))}
-          </select>
+          {slot ? (
+            // Only lengths that fit in the free times from the chosen one on
+            <select value={blockSlots} onChange={(e) => setBlockSlots(Number(e.target.value))}>
+              {BLOCK_LENGTH_OPTIONS.filter((n) => n <= freeSlotsInARow(daySlots, slot)).map((n) => (
+                <option key={n} value={n}>
+                  {formatDuration(n * slot.durationMinutes)} ({slot.time}–{fromMinutes(toMinutes(slot.time) + n * slot.durationMinutes)})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select disabled>
+              <option>Choose a time first</option>
+            </select>
+          )}
         </Field>
       )}
 

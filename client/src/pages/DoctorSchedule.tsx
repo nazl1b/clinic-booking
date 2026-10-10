@@ -119,7 +119,7 @@ export default function DoctorSchedule() {
       <PageHeader
         title="My schedule"
         actions={
-          <Button variant="secondary" onClick={openForm}>
+          <Button onClick={openForm}>
             Phone appointment / block time
           </Button>
         }

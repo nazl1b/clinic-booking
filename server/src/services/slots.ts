@@ -16,6 +16,7 @@ type Db = typeof prisma | Prisma.TransactionClient
 export interface FreeSlot {
   time: string // "HH:MM", clinic time
   durationMinutes: number
+  windowEnd: string // "HH:MM", end of the working window the slot is in: a block may not go past it
 }
 
 // A slot of the doctor's working hours that is not in the past, free or taken.
@@ -63,7 +64,7 @@ async function daySlots(db: Db, doctorId: number, date: string): Promise<DaySlot
     for (let start = window.start; start + window.slotMinutes <= window.end; start += window.slotMinutes) {
       if (start < earliest) continue
       const free = !overlapsAny(start, start + window.slotMinutes, busy)
-      slots.push({ time: fromMinutes(start), durationMinutes: window.slotMinutes, free })
+      slots.push({ time: fromMinutes(start), durationMinutes: window.slotMinutes, windowEnd: fromMinutes(window.end), free })
     }
   }
   return slots.sort((a, b) => a.time.localeCompare(b.time))
@@ -72,7 +73,7 @@ async function daySlots(db: Db, doctorId: number, date: string): Promise<DaySlot
 // Free slots of a doctor on a date. A deactivated doctor has none.
 export async function freeSlots(db: Db, doctor: { id: number; isActive: boolean }, date: string): Promise<FreeSlot[]> {
   if (!doctor.isActive) return []
-  return (await daySlots(db, doctor.id, date)).filter((s) => s.free).map(({ time, durationMinutes }) => ({ time, durationMinutes }))
+  return (await daySlots(db, doctor.id, date)).filter((s) => s.free).map(({ time, durationMinutes, windowEnd }) => ({ time, durationMinutes, windowEnd }))
 }
 
 // The slot that starts at `time`, if it is part of the doctor's working hours

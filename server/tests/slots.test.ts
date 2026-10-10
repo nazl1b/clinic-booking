@@ -32,10 +32,10 @@ describe('free slots by role', () => {
     const res = await slots(patient, active.id)
     expect(res.status).toBe(200)
     expect(res.body).toEqual([
-      { time: '09:00', durationMinutes: 30 },
-      { time: '09:30', durationMinutes: 30 },
-      { time: '10:00', durationMinutes: 30 },
-      { time: '10:30', durationMinutes: 30 },
+      { time: '09:00', durationMinutes: 30, windowEnd: '11:00' },
+      { time: '09:30', durationMinutes: 30, windowEnd: '11:00' },
+      { time: '10:00', durationMinutes: 30, windowEnd: '11:00' },
+      { time: '10:30', durationMinutes: 30, windowEnd: '11:00' },
     ])
     expect((await slots(patient, inactive.id)).status).toBe(404)
   })
@@ -51,6 +51,13 @@ describe('free slots by role', () => {
     const res = await slots(admin, inactive.id)
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
+  })
+
+  it('each slot says where its working window ends, also when two windows touch', async () => {
+    const touching = await createUser({ role: 'doctor' })
+    await setHours(touching.id, DAY, [['09:00', '10:00', 30], ['10:00', '11:00', 30]])
+    const res = await slots(admin, touching.id)
+    expect(res.body.map((s: { time: string; windowEnd: string }) => `${s.time}→${s.windowEnd}`)).toEqual(['09:00→10:00', '09:30→10:00', '10:00→11:00', '10:30→11:00'])
   })
 
   it('an id that is not a doctor is a 404', async () => {

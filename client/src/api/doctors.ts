@@ -6,6 +6,7 @@ import { request } from './client';
 export interface FreeSlot {
   time: string; // "HH:MM", clinic time
   durationMinutes: number;
+  windowEnd: string; // "HH:MM", end of the working window the slot is in
 }
 
 // GET /api/doctors — patients; active doctors only.

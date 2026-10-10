@@ -8,11 +8,12 @@ import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
 import { Muted } from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/PasswordInput';
-import { homePathFor, useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
 import type { InvitationPreview } from '../types';
 import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';
+import { homePathFor } from '../utils/roles';
 import { checkConfirmPassword, checkNewPassword } from '../utils/validation';
 
 // Opened from the invitation email: /accept-invite?token=...

@@ -17,7 +17,8 @@ import type { Appointment } from '../types';
 import { formatDate } from '../utils/dates';
 
 // One list: loading text, its error, or one page of the table with the page buttons.
-// Patients only have online appointments, so there is no Type column.
+// Patients only have online appointments, so there is no Type column. Both lists
+// share fixed column widths (.table-my-appointments), so their columns line up.
 type MyAppointmentListProps = Omit<ComponentProps<typeof AppointmentTable>, 'appointments'> & {
   list: ReturnType<typeof useMyAppointments>;
 };
@@ -27,7 +28,7 @@ function MyAppointmentList({ list, ...tableProps }: MyAppointmentListProps) {
   if (list.page === null) return <Muted>Loading…</Muted>;
   return (
     <div className={`results${list.busy ? ' results-busy' : ''}`} aria-busy={list.busy}>
-      <AppointmentTable appointments={list.page.items} showDoctor showType={false} {...tableProps} />
+      <AppointmentTable appointments={list.page.items} showDoctor showType={false} className="table-my-appointments" {...tableProps} />
       <Pagination page={list.page.page} pageSize={list.page.pageSize} total={list.page.total} onChange={list.setPage} />
     </div>
   );

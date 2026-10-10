@@ -1,20 +1,10 @@
 // Keeps track of who is logged in and exposes login / logout to the whole app.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authApi from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
-import type { Role, User } from '../types';
-
-interface AuthContextValue {
-  user: User | null;
-  loading: boolean; // true until GET /api/auth/me has answered
-  login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import type { User } from '../types';
+import { AuthContext, type AuthContextValue } from './auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -64,22 +54,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside <AuthProvider>');
-  return context;
-}
-
-// Landing page for each role after login.
-export function homePathFor(role: Role): string {
-  switch (role) {
-    case 'patient':
-      return '/doctors';
-    case 'doctor':
-      return '/doctor/schedule';
-    case 'admin':
-      return '/admin/appointments';
-  }
 }

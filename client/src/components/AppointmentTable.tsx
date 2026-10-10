@@ -23,6 +23,7 @@ interface AppointmentTableProps {
   freeSlots?: FreeSlot[]; // single-day list only: free times shown between the appointments
   onAddAt?: (slot: FreeSlot) => void; // "+ Add" on a free time
   emptyText?: string;
+  className?: string; // extra class on the table, e.g. fixed column widths
 }
 
 type Row = { kind: 'appointment'; time: string; appointment: Appointment } | { kind: 'free'; time: string; slot: FreeSlot };
@@ -86,6 +87,7 @@ export function AppointmentTable({
   freeSlots = [],
   onAddAt,
   emptyText,
+  className,
 }: AppointmentTableProps) {
   if (appointments.length === 0 && freeSlots.length === 0) return <Muted>{emptyText ?? 'No appointments.'}</Muted>;
 
@@ -112,7 +114,7 @@ export function AppointmentTable({
   if (freeSlots.length > 0) rows.sort((x, y) => x.time.localeCompare(y.time) || (x.kind === 'appointment' ? -1 : 1));
 
   return (
-    <Table columns={columns}>
+    <Table columns={columns} className={className}>
       {rows.map((row) => {
         if (row.kind === 'free') {
           const slot = row.slot;

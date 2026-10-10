@@ -1478,6 +1478,25 @@ input::-ms-reveal {
 .table .align-right {
   text-align: right;
 }
+/* My appointments: Upcoming and Past and cancelled get the same column widths,
+   so Date, Time, Doctor and Reason line up across the two tables. Reason takes
+   the rest; the last column is Actions in one table and Status in the other. */
+.table-my-appointments {
+  table-layout: fixed;
+  min-width: 720px; /* small screens scroll sideways instead of squeezing */
+}
+.table-my-appointments th:nth-child(1) {
+  width: 170px; /* Date */
+}
+.table-my-appointments th:nth-child(2) {
+  width: 120px; /* Time */
+}
+.table-my-appointments th:nth-child(3) {
+  width: 28%; /* Doctor */
+}
+.table-my-appointments th:last-child {
+  width: 140px; /* Actions / Status */
+}
 .row-actions {
   display: inline-flex;
   gap: 6px;
@@ -1730,11 +1749,17 @@ input::-ms-reveal {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+/* A day without free times: faded, so the days with room stand out (both themes use the tokens) */
+.day-btn-empty:not(.selected) {
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+}
 .day-btn-empty .day-btn-free {
   color: var(--text-muted);
 }
 .day-btn-empty:not(.selected) .day-btn-number {
   color: var(--text-muted);
+  font-weight: 500;
 }
 .day-btn.selected {
   background: var(--primary);

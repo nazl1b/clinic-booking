@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import type { Role } from '../../types';
 import { ROLE_LABELS } from '../../utils/roles';
 import { Icon, type IconName } from './Icon';

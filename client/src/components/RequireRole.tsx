@@ -3,8 +3,9 @@
 
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { homePathFor, useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import type { Role } from '../types';
+import { homePathFor } from '../utils/roles';
 import { ButtonLink } from './ui/Button';
 import { Card } from './ui/Card';
 import { Muted } from './ui/PageHeader';

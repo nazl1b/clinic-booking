@@ -6,7 +6,7 @@ import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { PasswordInput } from '../components/ui/PasswordInput';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
 import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';

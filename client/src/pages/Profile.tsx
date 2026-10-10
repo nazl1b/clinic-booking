@@ -9,7 +9,7 @@ import { Card } from '../components/ui/Card';
 import { Field, FormActions } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/PasswordInput';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
 import { BIO_MAX_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_HINT } from '../utils/limits';

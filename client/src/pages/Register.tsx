@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { PasswordInput } from '../components/ui/PasswordInput';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { MIN_PASSWORD_LENGTH, NAME_MAX_LENGTH, PASSWORD_HINT } from '../utils/limits';
 import { checkConfirmPassword, checkEmail, checkNewPassword, required } from '../utils/validation';

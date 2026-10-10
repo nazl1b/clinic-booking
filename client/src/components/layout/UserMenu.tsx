@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { ROLE_LABELS } from '../../utils/roles';
 import { initialOf } from '../../utils/text';
 import { useTheme } from '../../utils/theme';

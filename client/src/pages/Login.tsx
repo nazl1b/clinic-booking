@@ -6,10 +6,10 @@ import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
 import { PasswordInput } from '../components/ui/PasswordInput';
-import { homePathFor, useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { DEMO_ACCOUNTS, type DemoAccount } from '../utils/demo';
-import { ROLE_LABELS } from '../utils/roles';
+import { homePathFor, ROLE_LABELS } from '../utils/roles';
 import { checkEmail, required } from '../utils/validation';
 
 interface LoginState {

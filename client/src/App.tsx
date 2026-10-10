@@ -7,7 +7,8 @@ import { Card } from './components/ui/Card';
 import { Muted } from './components/ui/PageHeader';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { ToastProvider } from './components/ui/ToastProvider';
-import { AuthProvider, homePathFor, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import AcceptInvite from './pages/AcceptInvite';
 import AdminAppointments from './pages/AdminAppointments';
 import AdminDoctors from './pages/AdminDoctors';
@@ -23,6 +24,7 @@ import MyAppointments from './pages/MyAppointments';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
+import { homePathFor } from './utils/roles';
 
 // "/" sends each user to the home page of their role.
 function Home() {

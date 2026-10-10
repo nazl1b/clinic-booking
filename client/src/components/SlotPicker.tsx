@@ -3,8 +3,9 @@
 // are free on each day, so the user sees at a glance where there is room.
 // Picking a day shows its slots straight away, grouped into morning, afternoon
 // and evening; the slots reload only when the seven days (or doctor) change.
+// When a new seven days load, the first day with free times is selected.
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
 import { addDays, clinicToday, daysBetween, formatDate, formatWeekday, groupByDayPart } from '../utils/dates';
@@ -48,6 +49,21 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
       ignore = true;
     };
   }, [doctorId, weekStart, requestKey]);
+
+  // Once per doctor and seven days (opening the page, changing week or doctor):
+  // select the first day with free times. Not after a reload (reloadKey), and not
+  // when a time is already chosen (e.g. "+ Add" on a free time). If no day has
+  // times, the first day stays selected. A layout effect, so the empty first day
+  // never flashes on screen.
+  const weekKey = `${doctorId}|${weekStart}`;
+  const autoPickedWeek = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (result?.key !== requestKey || result.error || autoPickedWeek.current === weekKey) return;
+    autoPickedWeek.current = weekKey;
+    if (selectedTime) return;
+    const firstFree = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).find((d) => (result.slotsByDate[d]?.length ?? 0) > 0);
+    if (firstFree && firstFree !== date) onDateChange(firstFree);
+  }, [result, requestKey, weekKey, weekStart, selectedTime, date, onDateChange]);
 
   function pickDay(day: string) {
     if (day === date) return;

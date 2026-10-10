@@ -156,7 +156,7 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       )}
 
       <Field label="Note (optional)">
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={kind === 'block' ? 'e.g. Lunch break' : undefined} maxLength={NOTE_MAX_LENGTH} />
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={kind === 'block' ? 'e.g. Lunch break' : undefined} maxLength={NOTE_MAX_LENGTH} />
       </Field>
 
       <Alert type="error">{error}</Alert>

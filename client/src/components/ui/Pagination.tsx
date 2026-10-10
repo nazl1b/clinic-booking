@@ -1,4 +1,5 @@
 // "21–40 of 57" with Previous / Next buttons under a paged list.
+// A single page shows only the count, without the buttons.
 
 import { Icon } from '../layout/Icon';
 import { Button } from './Button';
@@ -21,19 +22,21 @@ export function Pagination({ page, pageSize, total, onChange }: PaginationProps)
       <span className="pagination-info tabular">
         {first}–{last} of {total}
       </span>
-      <div className="pagination-controls">
-        <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          <Icon name="chevronLeft" size={16} />
-          Previous
-        </Button>
-        <span className="pagination-page tabular" aria-current="page">
-          Page {page} of {pages}
-        </span>
-        <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>
-          Next
-          <Icon name="chevronRight" size={16} />
-        </Button>
-      </div>
+      {pages > 1 && (
+        <div className="pagination-controls">
+          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+            <Icon name="chevronLeft" size={16} />
+            Previous
+          </Button>
+          <span className="pagination-page tabular" aria-current="page">
+            Page {page} of {pages}
+          </span>
+          <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>
+            Next
+            <Icon name="chevronRight" size={16} />
+          </Button>
+        </div>
+      )}
     </nav>
   );
 }

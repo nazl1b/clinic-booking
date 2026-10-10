@@ -14,7 +14,7 @@ import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { useStaffCancel } from '../hooks/useStaffCancel';
 import type { Appointment, StaffAppointmentInput } from '../types';
 import { clinicToday, isIsoDate } from '../utils/dates';

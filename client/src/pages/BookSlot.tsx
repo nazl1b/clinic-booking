@@ -101,7 +101,7 @@ export default function BookSlot() {
           <ReasonSelect value={reason} onChange={setReason} />
         </Field>
         <Field label="Note (optional)">
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Symptoms or questions for the doctor" maxLength={NOTE_MAX_LENGTH} />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="e.g. Symptoms or questions for the doctor" maxLength={NOTE_MAX_LENGTH} />
         </Field>
         <Alert type="error">{error}</Alert>
         <div className="summary-bar">

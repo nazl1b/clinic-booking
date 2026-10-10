@@ -11,13 +11,14 @@ export interface Column {
 
 interface TableProps {
   columns: Column[];
+  className?: string; // extra class on <table>, e.g. fixed column widths
   children: ReactNode;
 }
 
-export function Table({ columns, children }: TableProps) {
+export function Table({ columns, className, children }: TableProps) {
   return (
     <div className="table-wrap">
-      <table className="table">
+      <table className={className ? `table ${className}` : 'table'}>
         <thead>
           <tr>
             {columns.map((column) => (

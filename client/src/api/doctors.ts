@@ -13,6 +13,11 @@ export function getDoctors(): Promise<Doctor[]> {
   return request('GET', '/doctors');
 }
 
+// GET /api/doctors/:id — patients; one active doctor (404 if deactivated or unknown).
+export function getDoctor(id: number): Promise<Doctor> {
+  return request('GET', `/doctors/${id}`);
+}
+
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD
 // Any logged-in role. Patients use it to book; doctors and admins use the same
 // free slots for manual appointments.

@@ -5,16 +5,19 @@
 import type { FreeSlot } from '../api/doctors';
 import type { Appointment } from '../types';
 import { formatDate, fromMinutes, isPast, toMinutes } from '../utils/dates';
+import { VISIT_REASON_LABELS } from '../utils/reasons';
 import { Badge, type BadgeTone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Muted } from './ui/PageHeader';
-import { ActionsCell, Table, type Column } from './ui/Table';
+import { ActionsCell, NoValue, Table, type Column } from './ui/Table';
 
 interface AppointmentTableProps {
   appointments: Appointment[];
   showDoctor?: boolean;
   showPatient?: boolean;
   showDate?: boolean; // default true; off for a single-day list
+  showType?: boolean; // default true; off for patients (they only have online appointments)
+  showStatus?: boolean; // default true; off where every row has the same status
   onCancel?: (appointment: Appointment) => void;
   cancellingId?: number | null;
   freeSlots?: FreeSlot[]; // single-day list only: free times shown between the appointments
@@ -55,7 +58,20 @@ function patientCell(a: Appointment) {
       </>
     );
   }
-  return <span className="muted">—</span>;
+  return <NoValue label="No patient" />; // blocked time
+}
+
+// The reason, with the note under it in small grey text. Blocks have no reason
+// (only a note, e.g. "Lunch break"), and neither do appointments made before reasons existed.
+function reasonCell(a: Appointment) {
+  if (!a.reason && !a.note) return <NoValue label="No reason" />;
+  if (!a.reason) return <div className="cell-secondary">{a.note}</div>;
+  return (
+    <>
+      {VISIT_REASON_LABELS[a.reason]}
+      {a.note && <div className="cell-secondary">{a.note}</div>}
+    </>
+  );
 }
 
 export function AppointmentTable({
@@ -63,6 +79,8 @@ export function AppointmentTable({
   showDoctor,
   showPatient,
   showDate = true,
+  showType = true,
+  showStatus = true,
   onCancel,
   cancellingId,
   freeSlots = [],
@@ -77,13 +95,13 @@ export function AppointmentTable({
     { label: 'Time' },
     ...(showDoctor ? [{ label: 'Doctor' }] : []),
     ...(showPatient ? [{ label: 'Patient' }] : []),
-    { label: 'Type' },
-    { label: 'Note' },
-    { label: 'Status' },
+    ...(showType ? [{ label: 'Type' }] : []),
+    { label: 'Reason' },
+    ...(showStatus ? [{ label: 'Status' }] : []),
     ...(hasActions ? [{ label: 'Actions', align: 'right' as const, hidden: true }] : []),
   ];
   // Columns a free-time row spans after the Time column.
-  const freeSpan = (showDoctor ? 1 : 0) + (showPatient ? 1 : 0) + 3;
+  const freeSpan = (showDoctor ? 1 : 0) + (showPatient ? 1 : 0) + (showType ? 1 : 0) + 1 + (showStatus ? 1 : 0);
 
   // Free times go between the appointments, by start time. When both start at
   // the same time (a cancelled appointment freed the slot), the appointment comes first.
@@ -134,13 +152,17 @@ export function AppointmentTable({
               </td>
             )}
             {showPatient && <td>{patientCell(a)}</td>}
-            <td>
-              <Badge tone={KIND[a.kind].tone}>{KIND[a.kind].label}</Badge>
-            </td>
-            <td>{a.note ?? <span className="muted">—</span>}</td>
-            <td>
-              <Badge tone={status.tone}>{status.label}</Badge>
-            </td>
+            {showType && (
+              <td>
+                <Badge tone={KIND[a.kind].tone}>{KIND[a.kind].label}</Badge>
+              </td>
+            )}
+            <td>{reasonCell(a)}</td>
+            {showStatus && (
+              <td>
+                <Badge tone={status.tone}>{status.label}</Badge>
+              </td>
+            )}
             {hasActions && (
               <ActionsCell>
                 {canCancel && (

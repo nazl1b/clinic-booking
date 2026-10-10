@@ -1,10 +1,27 @@
-// Appointment lists of the doctor and the admin: search, filters and one page,
-// all done in the database.
+// Appointment lists of the patient, the doctor and the admin: search, filters
+// and one page, all done in the database.
 import { prisma } from '../db.js'
 import type { Prisma } from '../generated/prisma/client.js'
-import { type AppointmentListQuery, DEFAULT_PAGE_SIZE } from '../schemas/appointments.js'
+import { type AppointmentListQuery, DEFAULT_PAGE_SIZE, MY_PAGE_SIZE, type MyAppointmentsQuery } from '../schemas/appointments.js'
 import { appointmentInclude, toAppointmentJson } from '../serializers.js'
 import { dateToDb } from '../utils/dates.js'
+import { upcomingWhere } from './appointments.js'
+
+// One page of the appointments that match `where`, plus how many match in total.
+// `id` is the last sort key, so the pages join without gaps or repeats.
+async function findPage(where: Prisma.AppointmentWhereInput, direction: Prisma.SortOrder, page: number, pageSize: number) {
+  const [total, rows] = await prisma.$transaction([
+    prisma.appointment.count({ where }),
+    prisma.appointment.findMany({
+      where,
+      orderBy: [{ date: direction }, { time: direction }, { id: direction }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: appointmentInclude,
+    }),
+  ])
+  return { items: rows.map(toAppointmentJson), page, pageSize, total }
+}
 
 // Prisma's `contains` becomes LIKE '%…%' without escaping, so "%" or "_" typed
 // by the user would match everything. Backslash is LIKE's escape character in Postgres.
@@ -47,17 +64,13 @@ export async function listAppointments(query: AppointmentListQuery, scope: { doc
   if (query.from) filters.push({ date: { gte: dateToDb(query.from) } })
   if (query.to) filters.push({ date: { lte: dateToDb(query.to) } })
   if (query.search) filters.push(await searchWhere(query.search, doctorId))
-  const where: Prisma.AppointmentWhereInput = { AND: filters }
+  return findPage({ AND: filters }, 'asc', page, pageSize)
+}
 
-  const [total, rows] = await prisma.$transaction([
-    prisma.appointment.count({ where }),
-    prisma.appointment.findMany({
-      where,
-      orderBy: [{ date: 'asc' }, { time: 'asc' }, { id: 'asc' }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: appointmentInclude,
-    }),
-  ])
-  return { items: rows.map(toAppointmentJson), page, pageSize, total }
+// The patient's own appointments. Upcoming ones come soonest first; past and
+// cancelled ones most recent first.
+export async function listPatientAppointments(patientId: number, query: MyAppointmentsQuery) {
+  const upcoming: Prisma.AppointmentWhereInput = { AND: [{ status: 'active' }, upcomingWhere()] }
+  const where: Prisma.AppointmentWhereInput = { AND: [{ patientId }, query.view === 'upcoming' ? upcoming : { NOT: upcoming }] }
+  return findPage(where, query.view === 'upcoming' ? 'asc' : 'desc', query.page ?? 1, query.pageSize ?? MY_PAGE_SIZE)
 }

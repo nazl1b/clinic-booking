@@ -14,7 +14,6 @@ import { checkEmail, required } from '../utils/validation';
 
 interface LoginState {
   from?: string; // page the user tried to open before logging in
-  message?: string; // e.g. "Password changed, please log in"
 }
 
 export default function Login() {
@@ -52,7 +51,6 @@ export default function Login() {
   return (
     <>
       <Card title="Log in" titleLevel={1} onSubmit={handleSubmit}>
-        <Alert type="success">{state.message}</Alert>
         <Field label="Email" error={errors.email}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoFocus />
         </Field>

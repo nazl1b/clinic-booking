@@ -1,4 +1,4 @@
-// Appointment lists: server-side search, filters and pages of 20.
+// Appointment lists: server-side search, filters and pages of 20 (10 for the patient's own).
 import { beforeAll, describe, expect, it } from 'vitest'
 import { dateToDb, fromMinutes, timeToDb } from '../src/utils/dates.js'
 import { createUser, inDays, insertAppointment, loginAs, prisma } from './helpers.js'
@@ -84,5 +84,62 @@ describe('filters and search', () => {
   it('the admin sees every doctor, or one with ?doctor=', async () => {
     expect((await admin.get('/api/admin/appointments')).body.total).toBe(49)
     expect((await admin.get(`/api/admin/appointments?doctor=${other.id}`)).body.total).toBe(3)
+  })
+})
+
+describe("the patient's own lists", () => {
+  let patient: Awaited<ReturnType<typeof createUser>>
+  let agent: Agent
+
+  beforeAll(async () => {
+    patient = await createUser({ role: 'patient' })
+    agent = await loginAs(patient.email)
+    // 12 upcoming and active, 3 upcoming but cancelled, 8 past (one of them cancelled).
+    const upcoming = Array.from({ length: 15 }, (_, i) => ({ date: inDays(20 + i), status: i < 12 ? ('active' as const) : ('cancelled' as const) }))
+    const past = Array.from({ length: 8 }, (_, i) => ({ date: inDays(-1 - i), status: i === 0 ? ('cancelled' as const) : ('active' as const) }))
+    await prisma.appointment.createMany({
+      data: [...upcoming, ...past].map(({ date, status }) => ({
+        doctorId: other.id,
+        kind: 'online' as const,
+        patientId: patient.id,
+        createdBy: patient.id,
+        date: dateToDb(date),
+        time: timeToDb('09:00'),
+        durationMinutes: 30,
+        status,
+      })),
+    })
+    // Another patient's appointment is never listed.
+    const stranger = await createUser({ role: 'patient' })
+    await insertAppointment({ doctorId: other.id, date: inDays(20), time: '10:00', patientId: stranger.id })
+  })
+
+  it('upcoming: active ones only, soonest first, pages of 10', async () => {
+    const page1 = await agent.get('/api/appointments/mine?view=upcoming')
+    expect(page1.status).toBe(200)
+    expect(page1.body).toMatchObject({ page: 1, pageSize: 10, total: 12 })
+    expect(page1.body.items).toHaveLength(10)
+    expect(page1.body.items[0].date).toBe(inDays(20))
+
+    const page2 = await agent.get('/api/appointments/mine?view=upcoming&page=2')
+    expect(page2.body.items.map((a: { date: string }) => a.date)).toEqual([inDays(30), inDays(31)])
+    expect(page2.body.items.every((a: { status: string }) => a.status === 'active')).toBe(true)
+  })
+
+  it('past: past and cancelled ones, latest first', async () => {
+    const page1 = await agent.get('/api/appointments/mine?view=past')
+    expect(page1.body).toMatchObject({ page: 1, pageSize: 10, total: 11 })
+    const dates = page1.body.items.map((a: { date: string }) => a.date)
+    expect(dates.slice(0, 3)).toEqual([inDays(34), inDays(33), inDays(32)]) // the cancelled upcoming ones
+    expect(dates[3]).toBe(inDays(-1))
+
+    const page2 = await agent.get('/api/appointments/mine?view=past&page=2')
+    expect(page2.body.items.map((a: { date: string }) => a.date)).toEqual([inDays(-8)])
+  })
+
+  it('needs a valid view and page', async () => {
+    expect((await agent.get('/api/appointments/mine')).status).toBe(400)
+    expect((await agent.get('/api/appointments/mine?view=all')).status).toBe(400)
+    expect((await agent.get('/api/appointments/mine?view=past&page=0')).status).toBe(400)
   })
 })

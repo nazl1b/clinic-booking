@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../context/AuthContext';
 import { useFieldErrors } from '../hooks/useFieldErrors';
+import { useToast } from '../hooks/useToast';
 import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';
 import { checkConfirmPassword, checkNewPassword } from '../utils/validation';
 
@@ -16,6 +17,7 @@ export default function ResetPassword() {
   const token = useSearchParams()[0].get('token') ?? '';
   const navigate = useNavigate();
   const { refresh } = useAuth();
+  const toast = useToast();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -30,7 +32,8 @@ export default function ResetPassword() {
     try {
       await resetPassword({ token, password });
       await refresh(); // all sessions of the user were logged out
-      navigate('/login', { replace: true, state: { message: 'Your password was changed. Please log in.' } });
+      toast.success('Your password was changed. Please log in.');
+      navigate('/login', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
       setSubmitting(false);

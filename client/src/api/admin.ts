@@ -36,8 +36,8 @@ export async function getUpcomingCount(doctorId: number): Promise<number> {
   return count;
 }
 
-// PATCH /api/admin/doctors/:id — edit details.
-export function updateDoctor(id: number, input: { name: string; specialty: string }): Promise<Doctor> {
+// PATCH /api/admin/doctors/:id — edit details. An empty bio removes it.
+export function updateDoctor(id: number, input: { name: string; specialty: string; bio: string }): Promise<Doctor> {
   return request('PATCH', `/admin/doctors/${id}`, { body: input });
 }
 

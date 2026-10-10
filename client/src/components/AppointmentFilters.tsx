@@ -7,6 +7,7 @@ import type { AppointmentFilters as Filters } from '../hooks/useAppointmentFilte
 import type { Doctor } from '../types';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
+import { SearchInput } from './ui/SearchInput';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -37,13 +38,12 @@ export function AppointmentFilters({ filters, onChange, onClear, isFiltered, doc
 
   return (
     <div className="toolbar filters" role="search">
-      <input
-        type="search"
+      <SearchInput
+        label="Search appointments"
         className="filters-search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search patient name, phone or email"
-        aria-label="Search appointments"
       />
       <select value={filters.status} onChange={(e) => onChange({ status: e.target.value as Filters['status'] })} aria-label="Status">
         <option value="">All statuses</option>

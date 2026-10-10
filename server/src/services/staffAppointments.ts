@@ -24,7 +24,14 @@ export function createStaffAppointment(input: StaffAppointmentInput, doctorId: n
       if (!slot) throw new HttpError(400, SLOT_NOT_AVAILABLE)
       if (!slot.free) throw new HttpError(409, SLOT_TAKEN)
       return tx.appointment.create({
-        data: { ...common, kind: 'manual', guestName: input.guestName, guestPhone: input.guestPhone, durationMinutes: slot.durationMinutes },
+        data: {
+          ...common,
+          kind: 'manual',
+          guestName: input.guestName,
+          guestPhone: input.guestPhone,
+          reason: input.reason,
+          durationMinutes: slot.durationMinutes,
+        },
         include: appointmentInclude,
       })
     }

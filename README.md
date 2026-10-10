@@ -197,12 +197,12 @@ All endpoints start with `/api` and answer JSON. Errors are `{ "error": "message
 |---|---|
 | Anyone | `POST auth/register`, `auth/login`, `auth/logout`, `auth/forgot-password`, `auth/reset-password` · `GET auth/me` · `GET invitations/:token`, `POST invitations/:token/accept` |
 | Logged in | `PATCH auth/password` · `GET doctors/:id/slots?date=` |
-| Patient | `GET doctors` · `POST appointments` · `GET appointments/mine` · `PATCH appointments/:id/cancel` |
+| Patient | `GET doctors` · `POST appointments` · `GET appointments/mine?view=upcoming|past` · `PATCH appointments/:id/cancel` |
 | Doctor | `GET`/`PUT doctor/availability` · `GET doctor/appointments` · `POST doctor/appointments` · `PATCH doctor/appointments/:id/cancel` |
 | Admin | `GET admin/doctors` · `GET admin/doctors/:id/upcoming-count` · `PATCH admin/doctors/:id` · `POST`/`GET admin/invitations` · `POST admin/invitations/:id/resend` · `DELETE admin/invitations/:id` · `GET`/`POST admin/appointments` · `PATCH admin/appointments/:id/cancel` |
 | Cron | `POST cron/reminders` (secret key) |
 
-The appointment lists take `page` (20 per page), `search` (patient name, email or phone), `status`, `kind`, `from`, `to`, and for the admin `doctor`, and answer `{ items, page, pageSize, total }`.
+The doctor's and admin's appointment lists take `page` (20 per page), `search` (patient name, email or phone), `status`, `kind`, `from`, `to`, and for the admin `doctor`. The patient's `appointments/mine` takes `view` (`upcoming`, or `past` for past and cancelled) and `page` (10 per page). All of them answer `{ items, page, pageSize, total }`.
 
 ## Not included yet
 

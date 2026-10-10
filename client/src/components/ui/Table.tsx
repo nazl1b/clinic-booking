@@ -33,6 +33,12 @@ export function Table({ columns, children }: TableProps) {
   );
 }
 
+// Content of a cell without a value: the cell looks empty, screen readers hear
+// `label` (e.g. "No reason") instead of skipping it.
+export function NoValue({ label }: { label: string }) {
+  return <span className="sr-only">{label}</span>;
+}
+
 // Right-aligned cell holding row buttons.
 export function ActionsCell({ children }: { children?: ReactNode }) {
   return (

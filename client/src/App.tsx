@@ -5,6 +5,8 @@ import { GuestOnly, RequireRole } from './components/RequireRole';
 import { ButtonLink } from './components/ui/Button';
 import { Card } from './components/ui/Card';
 import { Muted } from './components/ui/PageHeader';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
+import { ToastProvider } from './components/ui/ToastProvider';
 import { AuthProvider, homePathFor, useAuth } from './context/AuthContext';
 import AcceptInvite from './pages/AcceptInvite';
 import AdminAppointments from './pages/AdminAppointments';
@@ -12,6 +14,7 @@ import AdminDoctors from './pages/AdminDoctors';
 import Availability from './pages/Availability';
 import BookSlot from './pages/BookSlot';
 import DoctorAppointments from './pages/DoctorAppointments';
+import DoctorProfile from './pages/DoctorProfile';
 import DoctorSchedule from './pages/DoctorSchedule';
 import Doctors from './pages/Doctors';
 import ForgotPassword from './pages/ForgotPassword';
@@ -50,43 +53,48 @@ function NotFound() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Pages without sidebar (404 is at the end) */}
-          <Route element={<AuthLayout />}>
-            <Route path="login" element={<GuestOnly><Login /></GuestOnly>} />
-            <Route path="register" element={<GuestOnly><Register /></GuestOnly>} />
-            <Route path="forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
-            <Route path="reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
-            {/* Not GuestOnly: a logged-in user is asked to log out first */}
-            <Route path="accept-invite" element={<AcceptInvite />} />
-          </Route>
+      <ToastProvider>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Pages without sidebar (404 is at the end) */}
+              <Route element={<AuthLayout />}>
+                <Route path="login" element={<GuestOnly><Login /></GuestOnly>} />
+                <Route path="register" element={<GuestOnly><Register /></GuestOnly>} />
+                <Route path="forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+                <Route path="reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
+                {/* Not GuestOnly: a logged-in user is asked to log out first */}
+                <Route path="accept-invite" element={<AcceptInvite />} />
+              </Route>
 
-          {/* Logged-in pages: sidebar + top bar */}
-          <Route element={<RequireRole><AppLayout /></RequireRole>}>
-            <Route index element={<Home />} />
-            <Route path="profile" element={<Profile />} />
+              {/* Logged-in pages: sidebar + top bar */}
+              <Route element={<RequireRole><AppLayout /></RequireRole>}>
+                <Route index element={<Home />} />
+                <Route path="profile" element={<Profile />} />
 
-            {/* Patient */}
-            <Route path="doctors" element={<RequireRole roles={['patient']}><Doctors /></RequireRole>} />
-            <Route path="doctors/:id/book" element={<RequireRole roles={['patient']}><BookSlot /></RequireRole>} />
-            <Route path="appointments" element={<RequireRole roles={['patient']}><MyAppointments /></RequireRole>} />
+                {/* Patient */}
+                <Route path="doctors" element={<RequireRole roles={['patient']}><Doctors /></RequireRole>} />
+                <Route path="doctors/:id" element={<RequireRole roles={['patient']}><DoctorProfile /></RequireRole>} />
+                <Route path="doctors/:id/book" element={<RequireRole roles={['patient']}><BookSlot /></RequireRole>} />
+                <Route path="appointments" element={<RequireRole roles={['patient']}><MyAppointments /></RequireRole>} />
 
-            {/* Doctor */}
-            <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
-            <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
-            <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
+                {/* Doctor */}
+                <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
+                <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
+                <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
 
-            {/* Admin */}
-            <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
-            <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
-          </Route>
+                {/* Admin */}
+                <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
+                <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
+              </Route>
 
-          <Route element={<NotFoundLayout />}>
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+              <Route element={<NotFoundLayout />}>
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ConfirmProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

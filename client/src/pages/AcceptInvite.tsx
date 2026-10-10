@@ -10,6 +10,7 @@ import { Muted } from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { homePathFor, useAuth } from '../context/AuthContext';
 import { useFieldErrors } from '../hooks/useFieldErrors';
+import { useToast } from '../hooks/useToast';
 import type { InvitationPreview } from '../types';
 import { MIN_PASSWORD_LENGTH, MISSING_TOKEN, PASSWORD_HINT } from '../utils/limits';
 import { checkConfirmPassword, checkNewPassword } from '../utils/validation';
@@ -21,6 +22,7 @@ export default function AcceptInvite() {
   const { user, loading: authLoading, logout } = useAuth();
   const token = useSearchParams()[0].get('token') ?? '';
   const navigate = useNavigate();
+  const toast = useToast();
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
   const [fetchError, setFetchError] = useState('');
   const [password, setPassword] = useState('');
@@ -47,7 +49,8 @@ export default function AcceptInvite() {
     setSubmitting(true);
     try {
       await acceptInvitation(token, password);
-      navigate('/login', { replace: true, state: { message: 'Your account is ready. Please log in.' } });
+      toast.success('Your account is ready. Please log in.');
+      navigate('/login', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
       setSubmitting(false);

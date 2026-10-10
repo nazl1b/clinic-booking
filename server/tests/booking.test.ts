@@ -18,12 +18,12 @@ beforeEach(async () => {
   await setHours(doctor.id, DAY, [['09:00', '12:00', 30]])
 })
 
-const book = (time: string, date = DAY, doctorId = doctor.id) => patient.post('/api/appointments').send({ doctorId, date, time })
+const book = (time: string, date = DAY, doctorId = doctor.id) => patient.post('/api/appointments').send({ doctorId, date, time, reason: 'follow_up' })
 const freeTimes = async () => ((await patient.get(`/api/doctors/${doctor.id}/slots?date=${DAY}`)).body as { time: string }[]).map((s) => s.time)
 
 describe('booking', () => {
   it('books a free slot; the length comes from the working hours', async () => {
-    const res = await patient.post('/api/appointments').send({ doctorId: doctor.id, date: DAY, time: '09:30', durationMinutes: 300 })
+    const res = await patient.post('/api/appointments').send({ doctorId: doctor.id, date: DAY, time: '09:30', reason: 'check_up', durationMinutes: 300 })
     expect(res.status).toBe(201)
     expect(res.body).toMatchObject({ kind: 'online', date: DAY, time: '09:30', durationMinutes: 30, status: 'active', doctorName: 'Dr Booking' })
     expect(await freeTimes()).not.toContain('09:30')
@@ -88,7 +88,7 @@ describe('overlaps', () => {
   it('a phone appointment closes the slot for online booking', async () => {
     const phone = await doctorAgent
       .post('/api/doctor/appointments')
-      .send({ kind: 'manual', date: DAY, time: '11:00', guestName: 'Phone Patient', guestPhone: '+30 690 000 0000' })
+      .send({ kind: 'manual', date: DAY, time: '11:00', guestName: 'Phone Patient', guestPhone: '+30 690 000 0000', reason: 'first_visit' })
     expect(phone.status).toBe(201)
 
     expect(await freeTimes()).not.toContain('11:00')

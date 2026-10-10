@@ -4,12 +4,12 @@
 // Safe to run more than once (Render runs it on every deploy): existing users are
 // left as they are, a demo doctor's bio is only written while it is empty or an
 // earlier text of this seed, and demo working hours / appointments are only added
-// when they are missing.
+// when they are missing. Demo appointments from before visit reasons existed get one.
 import '../src/env.js'
 import { hashPassword } from '../src/services/passwords.js'
 import { prisma } from '../src/db.js'
 import { dateToDb, timeToDb } from '../src/utils/dates.js'
-import type { AppointmentKind, AppointmentStatus, Role } from '../src/generated/prisma/client.js'
+import type { AppointmentKind, AppointmentStatus, Role, VisitReason } from '../src/generated/prisma/client.js'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -214,6 +214,7 @@ async function seedDemo(password: string) {
 
   // Appointments, only if the first demo doctors have none yet (the newer doctors get none).
   if (await prisma.appointment.count({ where: { doctorId: { in: [maria, nikos, eleni] } } })) {
+    await addMissingReasons([maria, nikos, eleni, andreas, katerina, dimitris, sofia, petros, ioanna])
     console.log('Demo appointments already exist, skipped')
     return
   }
@@ -224,6 +225,7 @@ async function seedDemo(password: string) {
     patientId?: number
     guestName?: string
     guestPhone?: string
+    reason?: VisitReason
     note?: string
     createdBy: number
     date: string
@@ -231,10 +233,10 @@ async function seedDemo(password: string) {
     durationMinutes: number
     status?: AppointmentStatus
   }
-  const online = (doctorId: number, patientId: number, date: string, time: string, durationMinutes: number, extra: Partial<Row> = {}): Row =>
-    ({ doctorId, kind: 'online', patientId, createdBy: patientId, date, time, durationMinutes, ...extra })
-  const manual = (guestName: string, guestPhone: string, date: string, time: string, note?: string): Row =>
-    ({ doctorId: maria, kind: 'manual', guestName, guestPhone, note, createdBy: maria, date, time, durationMinutes: 30 })
+  const online = (doctorId: number, patientId: number, date: string, time: string, durationMinutes: number, reason: VisitReason, extra: Partial<Row> = {}): Row =>
+    ({ doctorId, kind: 'online', patientId, createdBy: patientId, date, time, durationMinutes, reason, ...extra })
+  const manual = (guestName: string, guestPhone: string, date: string, time: string, reason: VisitReason, note?: string): Row =>
+    ({ doctorId: maria, kind: 'manual', guestName, guestPhone, reason, note, createdBy: maria, date, time, durationMinutes: 30 })
   const block = (note: string, date: string, time: string, durationMinutes: number): Row =>
     ({ doctorId: maria, kind: 'block', note, createdBy: maria, date, time, durationMinutes })
 
@@ -245,24 +247,24 @@ async function seedDemo(password: string) {
     // Maria's day today, spread over morning and evening so the schedule always
     // has past, upcoming, phone, blocked and cancelled entries whatever the time
     // (on a weekend they fall outside her working hours; they are still shown).
-    online(maria, john, today, '09:00', 30, { note: 'Follow-up, blood pressure' }),
-    online(maria, anna, today, '10:00', 30),
-    manual('Katerina Vlachou', '+30 694 123 4567', today, '11:00', 'First visit'),
+    online(maria, john, today, '09:00', 30, 'follow_up', { note: 'Blood pressure' }),
+    online(maria, anna, today, '10:00', 30, 'first_visit'),
+    manual('Katerina Vlachou', '+30 694 123 4567', today, '11:00', 'first_visit', 'Chest pain when climbing stairs'),
     block('Hospital rounds', today, '12:00', 60),
-    online(maria, anna, today, '13:00', 30, { status: 'cancelled' }),
-    manual('Dimitris Kostas', '+30 697 555 0192', today, '17:30'),
-    online(maria, john, today, '19:00', 30, { note: 'Annual check-up' }),
+    online(maria, anna, today, '13:00', 30, 'follow_up', { status: 'cancelled' }),
+    manual('Dimitris Kostas', '+30 697 555 0192', today, '17:30', 'test_results'),
+    online(maria, john, today, '19:00', 30, 'check_up', { note: 'Annual check-up' }),
 
-    online(maria, john, tue, '09:30', 30),
-    online(maria, anna, tue, '10:00', 30),
-    manual('George Pappas', '+30 690 000 0001', tue, '11:00'),
+    online(maria, john, tue, '09:30', 30, 'test_results', { note: 'Blood tests from last week' }),
+    online(maria, anna, tue, '10:00', 30, 'follow_up'),
+    manual('George Pappas', '+30 690 000 0001', tue, '11:00', 'other', 'Needs a medical certificate for work'),
     block('Lunch break', tue, '12:00', 60),
-    online(nikos, john, wed, '10:20', 20),
-    online(maria, john, nextWeekday(4), '09:00', 30, { status: 'cancelled' }),
+    online(nikos, john, wed, '10:20', 20, 'first_visit', { note: 'Mole on the back' }),
+    online(maria, john, nextWeekday(4), '09:00', 30, 'check_up', { status: 'cancelled' }),
     // Past appointment, kept as history
-    online(maria, john, addDays(today, -7), '10:00', 30),
+    online(maria, john, addDays(today, -7), '10:00', 30, 'first_visit'),
     // Future appointments of the inactive doctor were cancelled when she was deactivated
-    online(eleni, anna, nextWeekday(2, 1), '09:00', 30, { status: 'cancelled' }),
+    online(eleni, anna, nextWeekday(2, 1), '09:00', 30, 'check_up', { status: 'cancelled' }),
   ]
 
   // Enough history and future bookings to page through the appointment lists.
@@ -287,22 +289,49 @@ async function seedDemo(password: string) {
     if (weekday !== 0) {
       const saturday = weekday === 6
       const time = (saturday ? ['09:30', '10:30', '12:00', '12:30'] : ['13:30', '17:00', '18:00', '19:30'])[i % 4]
-      rows.push(online(maria, patients[i % patients.length], date, time, 30, i % 7 === 3 ? { status: 'cancelled' } : {}))
+      rows.push(online(maria, patients[i % patients.length], date, time, 30, demoReason(i), i % 7 === 3 ? { status: 'cancelled' } : {}))
       if (i % 3 === 0) {
         const [guestName, guestPhone] = guests[i % guests.length]
-        rows.push(manual(guestName, guestPhone, date, saturday ? '11:00' : i % 2 ? '11:30' : '18:30'))
+        rows.push(manual(guestName, guestPhone, date, saturday ? '11:00' : i % 2 ? '11:30' : '18:30', demoReason(i + 1)))
       }
       if (i % 9 === 0) rows.push(block('Admin time', date, '09:00', 30))
     }
 
     const nikosTime = nikosTimes[weekday]
-    if (nikosTime) rows.push(online(nikos, patients[(i + 2) % patients.length], date, nikosTime, 20))
+    if (nikosTime) rows.push(online(nikos, patients[(i + 2) % patients.length], date, nikosTime, 20, demoReason(i + 2)))
   }
 
   await prisma.appointment.createMany({
     data: rows.map((row) => ({ ...row, date: dateToDb(row.date), time: timeToDb(row.time) })),
   })
   console.log(`Demo data: 9 doctors, ${patients.length} patients, ${rows.length} appointments`)
+}
+
+// Reasons of the generated demo appointments: a repeating mix, follow-ups most often.
+const DEMO_REASONS: VisitReason[] = ['follow_up', 'first_visit', 'check_up', 'follow_up', 'test_results', 'other']
+const demoReason = (n: number) => DEMO_REASONS[n % DEMO_REASONS.length]
+
+// Notes this seed wrote before reasons existed, and the reason each one stands for.
+const REASON_OF_OLD_NOTE: Record<string, VisitReason> = {
+  'Follow-up, blood pressure': 'follow_up',
+  'First visit': 'first_visit',
+  'Annual check-up': 'check_up',
+}
+
+// Online and phone appointments of the demo doctors made before reasons existed get
+// one, so the demo always shows a reason. Blocks never have one; other doctors are left alone.
+async function addMissingReasons(doctorIds: number[]) {
+  const missing = await prisma.appointment.findMany({
+    where: { doctorId: { in: doctorIds }, kind: { in: ['online', 'manual'] }, reason: null },
+    select: { id: true, note: true },
+  })
+  const idsByReason = new Map<VisitReason, number[]>()
+  for (const { id, note } of missing) {
+    const reason = (note && REASON_OF_OLD_NOTE[note]) || demoReason(id)
+    idsByReason.set(reason, [...(idsByReason.get(reason) ?? []), id])
+  }
+  for (const [reason, ids] of idsByReason) await prisma.appointment.updateMany({ where: { id: { in: ids } }, data: { reason } })
+  if (missing.length) console.log(`Demo appointments: added a reason to ${missing.length}`)
 }
 
 async function main() {

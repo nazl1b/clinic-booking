@@ -20,7 +20,7 @@ export default function AdminAppointments() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorsError, setDoctorsError] = useState(''); // only the doctor filter and the form need the list
   const [showForm, setShowForm] = useState(false);
-  const { handleCancel, cancellingId, error, success } = useStaffCancel({ cancel: cancelAnyAppointment, onCancelled: reload, showDoctor: true });
+  const { handleCancel, cancellingId } = useStaffCancel({ cancel: cancelAnyAppointment, onCancelled: reload, showDoctor: true });
 
   useEffect(() => {
     getAllDoctors()
@@ -55,8 +55,6 @@ export default function AdminAppointments() {
 
         <Alert type="error">{loadError}</Alert>
         <Alert type="error">{doctorsError && `Could not load the list of doctors: ${doctorsError}`}</Alert>
-        <Alert type="error">{error}</Alert>
-        <Alert type="success">{success}</Alert>
         {!loadError && (
           <AppointmentResults
             page={page}

@@ -1,13 +1,14 @@
-// Week strip + grid of free time slots for one doctor. The strip shows the
-// seven days of the chosen date's week and how many times are free on each
-// day, so the user sees at a glance where there is room. Picking a day shows
-// its slots straight away; the week's slots reload only when the week (or
-// doctor) changes.
+// Day strip + free time slots for one doctor. The strip shows seven days,
+// starting today (clinic time) and moving 7 days at a time, with how many times
+// are free on each day, so the user sees at a glance where there is room.
+// Picking a day shows its slots straight away, grouped into morning, afternoon
+// and evening; the slots reload only when the seven days (or doctor) change.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import { getDoctorSlots, type FreeSlot } from '../api/doctors';
-import { addDays, clinicToday, formatDate, formatWeekday, startOfWeek } from '../utils/dates';
+import { addDays, clinicToday, daysBetween, formatDate, formatWeekday, groupByDayPart } from '../utils/dates';
+import { Icon } from './layout/Icon';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { Muted } from './ui/PageHeader';
@@ -22,8 +23,10 @@ interface SlotPickerProps {
 }
 
 export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelectTime, reloadKey = 0 }: SlotPickerProps) {
+  const groupId = useId();
   const today = clinicToday();
-  const weekStart = startOfWeek(date);
+  // The seven days shown: today + 0, 7, 14… days, whichever block holds `date`.
+  const weekStart = addDays(today, Math.floor(Math.max(0, daysBetween(today, date)) / 7) * 7);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   // The result remembers which request it belongs to; while it does not match
@@ -38,8 +41,7 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
   useEffect(() => {
     let ignore = false;
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    // Past days can have no free times, so they are not requested.
-    Promise.all(weekDays.map((d) => (d < clinicToday() ? Promise.resolve([]) : getDoctorSlots(doctorId, d))))
+    Promise.all(weekDays.map((d) => getDoctorSlots(doctorId, d)))
       .then((lists) => !ignore && setResult({ key: requestKey, slotsByDate: Object.fromEntries(weekDays.map((d, i) => [d, lists[i]])), error: '' }))
       .catch((err) => !ignore && setResult({ key: requestKey, slotsByDate: {}, error: getErrorMessage(err) }));
     return () => {
@@ -53,20 +55,22 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
     onSelectTime(null);
   }
 
-  // Moving to another week selects its first day that is not in the past.
+  // Moving 7 days selects the first of the new seven (never before today).
   function moveWeek(weeks: number) {
     const start = addDays(weekStart, weeks * 7);
     pickDay(start < today ? today : start);
   }
 
+  const groups = groupByDayPart(slots);
+
   return (
     <div className="stack-sm">
       <div className="week-picker-head">
-        <Button variant="secondary" size="sm" onClick={() => moveWeek(-1)} disabled={weekStart <= today} aria-label="Previous week">
-          ‹
+        <Button variant="secondary" size="sm" onClick={() => moveWeek(-1)} disabled={weekStart <= today} aria-label="Previous 7 days">
+          <Icon name="chevronLeft" size={16} />
         </Button>
-        <Button variant="secondary" size="sm" onClick={() => moveWeek(1)} aria-label="Next week">
-          ›
+        <Button variant="secondary" size="sm" onClick={() => moveWeek(1)} aria-label="Next 7 days">
+          <Icon name="chevronRight" size={16} />
         </Button>
         <strong className="week-picker-label">
           {formatDate(weekStart)} – {formatDate(addDays(weekStart, 6))}
@@ -75,18 +79,16 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
 
       <div className="day-strip" role="group" aria-label="Day">
         {days.map((day) => {
-          const past = day < today;
           const count = slotsByDate[day]?.length ?? 0;
-          const status = past ? '—' : loading ? '…' : count > 0 ? `${count} free` : 'No times';
-          const classes = ['day-btn', day === date && 'selected', !past && !loading && count === 0 && 'day-btn-empty'].filter(Boolean).join(' ');
+          const status = loading ? '…' : count > 0 ? `${count} free` : 'No times';
+          const classes = ['day-btn', day === date && 'selected', !loading && count === 0 && 'day-btn-empty'].filter(Boolean).join(' ');
           return (
             <button
               key={day}
               type="button"
               className={classes}
-              disabled={past}
               aria-pressed={day === date}
-              aria-label={`${formatDate(day)}, ${status === '—' ? 'past' : status}`}
+              aria-label={`${formatDate(day)}, ${loading ? 'loading' : status}`}
               onClick={() => pickDay(day)}
             >
               <span className="day-btn-weekday">{day === today ? 'Today' : formatWeekday(day)}</span>
@@ -103,18 +105,26 @@ export function SlotPicker({ doctorId, date, onDateChange, selectedTime, onSelec
       ) : slots.length === 0 ? (
         !error && <Muted>No free times on {formatDate(date)}. Try another day.</Muted>
       ) : (
-        <div className="slot-grid" role="listbox" aria-label={`Free times on ${formatDate(date)}`}>
-          {slots.map((slot) => (
-            <button
-              key={slot.time}
-              type="button"
-              role="option"
-              aria-selected={slot.time === selectedTime}
-              className={`slot${slot.time === selectedTime ? ' selected' : ''}`}
-              onClick={() => onSelectTime(slot)}
-            >
-              {slot.time}
-            </button>
+        <div className="slot-groups" role="group" aria-label={`Free times on ${formatDate(date)}`}>
+          {groups.map((group) => (
+            <section key={group.label} className="slot-group" aria-labelledby={`${groupId}-${group.label}`}>
+              <h3 id={`${groupId}-${group.label}`} className="slot-group-title">
+                {group.label}
+              </h3>
+              <div className="slot-grid">
+                {group.items.map((slot) => (
+                  <button
+                    key={slot.time}
+                    type="button"
+                    aria-pressed={slot.time === selectedTime}
+                    className={`slot${slot.time === selectedTime ? ' selected' : ''}`}
+                    onClick={() => onSelectTime(slot)}
+                  >
+                    {slot.time}
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

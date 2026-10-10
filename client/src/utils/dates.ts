@@ -43,15 +43,14 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Whole days from `from` to `to` (negative when `to` is earlier).
+export function daysBetween(from: string, to: string): number {
+  return Math.round((toUtcDate(to).getTime() - toUtcDate(from).getTime()) / 86_400_000);
+}
+
 // 0 = Sunday … 6 = Saturday
 export function dayOfWeek(date: string): number {
   return toUtcDate(date).getUTCDay();
-}
-
-// Monday of the week that contains `date`.
-export function startOfWeek(date: string): string {
-  const offset = (dayOfWeek(date) + 6) % 7;
-  return addDays(date, -offset);
 }
 
 export function toMinutes(time: string): number {
@@ -101,3 +100,19 @@ export function formatTimestamp(iso: string): string {
 }
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Parts of the day for grouping free times, by start time: a time belongs to the
+// first part it is before. Morning < 12:00 ≤ Afternoon < 17:00 ≤ Evening.
+export const DAY_PARTS = [
+  { label: 'Morning', before: '12:00' },
+  { label: 'Afternoon', before: '17:00' },
+  { label: 'Evening', before: '24:00' },
+] as const;
+
+// Items with a "HH:MM" time, grouped by DAY_PARTS; parts without items are left out.
+export function groupByDayPart<T extends { time: string }>(items: T[]): { label: string; items: T[] }[] {
+  return DAY_PARTS.map((part, i) => ({
+    label: part.label,
+    items: items.filter((item) => item.time < part.before && (i === 0 || item.time >= DAY_PARTS[i - 1].before)),
+  })).filter((group) => group.items.length > 0);
+}

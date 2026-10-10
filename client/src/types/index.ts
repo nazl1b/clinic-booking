@@ -8,6 +8,7 @@ export interface User {
   email: string;
   role: Role;
   specialty: string | null; // doctors only
+  bio: string | null; // doctors only
   isActive: boolean;
 }
 
@@ -16,6 +17,7 @@ export interface Doctor {
   name: string;
   email: string;
   specialty: string;
+  bio: string | null; // short text for patients, null = none
   isActive: boolean;
 }
 
@@ -29,6 +31,8 @@ export interface AvailabilityRule {
 
 export type AppointmentKind = 'online' | 'manual' | 'block';
 export type AppointmentStatus = 'active' | 'cancelled';
+// Labels in utils/reasons.ts
+export type VisitReason = 'first_visit' | 'follow_up' | 'check_up' | 'test_results' | 'other';
 
 export interface Appointment {
   id: number;
@@ -40,6 +44,7 @@ export interface Appointment {
   patientName: string | null; // online only
   guestName: string | null; // manual only
   guestPhone: string | null; // manual only
+  reason: VisitReason | null; // online and manual; null on blocks and on appointments made before reasons existed
   note: string | null;
   date: string; // "YYYY-MM-DD" (clinic time)
   time: string; // "HH:MM" (clinic time)
@@ -60,6 +65,10 @@ export interface AppointmentQuery {
   page?: number; // 1-based
   pageSize?: number; // default 20, at most 100
 }
+
+// The patient's two lists on My appointments: upcoming (active, not started
+// yet) and past (past or cancelled).
+export type MyAppointmentsView = 'upcoming' | 'past';
 
 // One page of a list plus the number of matching rows in total.
 export interface Page<T> {
@@ -86,7 +95,7 @@ export interface InvitationPreview {
 
 // Body for a manual (phone) appointment or a blocked time.
 export type StaffAppointmentInput =
-  | { kind: 'manual'; doctorId: number; date: string; time: string; guestName: string; guestPhone: string; note?: string }
+  | { kind: 'manual'; doctorId: number; date: string; time: string; guestName: string; guestPhone: string; reason: VisitReason; note?: string }
   | { kind: 'block'; doctorId: number; date: string; time: string; durationMinutes: number; note?: string };
 
 export interface PhoneContact {

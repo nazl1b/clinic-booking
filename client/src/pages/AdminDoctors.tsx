@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   cancelInvitation,
   deactivateDoctor,
@@ -18,25 +18,22 @@ import { Card } from '../components/ui/Card';
 import { Field, FormActions, FormRow } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { ActionsCell, Table } from '../components/ui/Table';
+import { useConfirm } from '../hooks/useConfirm';
 import { useFieldErrors } from '../hooks/useFieldErrors';
+import { useToast } from '../hooks/useToast';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
-import { INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
+import { BIO_MAX_LENGTH, INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
 import { plural } from '../utils/text';
 import { checkEmail, required } from '../utils/validation';
 
-interface PendingDeactivation {
-  doctor: Doctor;
-  upcomingCount: number;
-}
-
 export default function AdminDoctors() {
+  const confirm = useConfirm();
+  const toast = useToast();
   // Both lists are null until loaded; loadError replaces them when loading fails.
   const [doctors, setDoctors] = useState<Doctor[] | null>(null);
   const [invitations, setInvitations] = useState<(Invitation & { expired: boolean })[] | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null); // e.g. "invite-3", "doctor-2"
 
   // Invite form
@@ -52,9 +49,9 @@ export default function AdminDoctors() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [editSpecialty, setEditSpecialty] = useState('');
+  const [editBio, setEditBio] = useState('');
 
-  // Deactivation
-  const [pendingDeactivation, setPendingDeactivation] = useState<PendingDeactivation | null>(null);
+  // Deactivation: phone appointments the admin has to call (shown until closed)
   const [deactivationResult, setDeactivationResult] = useState<(DeactivationResult & { doctorName: string }) | null>(null);
 
   const load = useCallback(() => {
@@ -70,19 +67,17 @@ export default function AdminDoctors() {
 
   useEffect(load, [load]);
 
-  // Runs an action, shows its success message or error, then reloads the lists.
+  // Runs an action, shows its success or error as a toast, then reloads the lists.
   // Returns true on success.
   async function run(id: string, action: () => Promise<unknown>, message: string): Promise<boolean> {
-    setError('');
-    setSuccess('');
     setBusyId(id);
     try {
       await action();
-      setSuccess(message);
+      toast.success(message);
       load();
       return true;
     } catch (err) {
-      setError(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
       return false;
     } finally {
       setBusyId(null);
@@ -92,7 +87,6 @@ export default function AdminDoctors() {
   async function handleInvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setInviteError('');
-    setSuccess('');
     const valid = validateInvite(e.currentTarget, {
       name: required(inviteName, "Please enter the doctor's name."),
       specialty: required(inviteSpecialty, 'Please enter the specialty.'),
@@ -102,7 +96,7 @@ export default function AdminDoctors() {
     setInviting(true);
     try {
       const invitation = await inviteDoctor({ name: inviteName, specialty: inviteSpecialty, email: inviteEmail });
-      setSuccess(`Invitation sent to ${invitation.email}. The link is valid for ${plural(INVITATION_HOURS, 'hour')}.`);
+      toast.success(`Invitation sent to ${invitation.email}. The link is valid for ${plural(INVITATION_HOURS, 'hour')}.`);
       setInviteName('');
       setInviteSpecialty('');
       setInviteEmail('');
@@ -119,41 +113,73 @@ export default function AdminDoctors() {
     setEditingId(doctor.id);
     setEditName(doctor.name);
     setEditSpecialty(doctor.specialty);
+    setEditBio(doctor.bio ?? '');
   }
 
   async function saveEdit(doctorId: number) {
-    const saved = await run(`doctor-${doctorId}`, () => updateDoctor(doctorId, { name: editName, specialty: editSpecialty }), 'Doctor details saved.');
+    const saved = await run(`doctor-${doctorId}`, () => updateDoctor(doctorId, { name: editName, specialty: editSpecialty, bio: editBio }), 'Doctor details saved.');
     if (saved) setEditingId(null);
   }
 
+  // First how many upcoming appointments would be cancelled, then the confirm dialog.
   async function askDeactivate(doctor: Doctor) {
-    setError('');
-    setSuccess('');
+    const opener = document.activeElement as HTMLElement | null; // the button is disabled while counting
     setDeactivationResult(null);
     setBusyId(`doctor-${doctor.id}`);
+    let upcomingCount: number;
     try {
-      setPendingDeactivation({ doctor, upcomingCount: await getUpcomingCount(doctor.id) });
+      upcomingCount = await getUpcomingCount(doctor.id);
     } catch (err) {
-      setError(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
+      return;
+    } finally {
+      setBusyId(null);
+    }
+
+    const confirmed = await confirm({
+      title: `Deactivate ${doctor.name}?`,
+      message: (
+        <>
+          {upcomingCount > 0 ? (
+            <p>
+              This doctor has <strong>{plural(upcomingCount, 'upcoming appointment')}</strong>. They will all be cancelled. Patients with an account will be
+              emailed; you will get a list of phone appointments to call.
+            </p>
+          ) : (
+            <p>This doctor has no upcoming appointments.</p>
+          )}
+          <p>The doctor will be logged out and can no longer log in. Past appointments stay as history. You can reactivate the account later.</p>
+        </>
+      ),
+      confirmLabel: 'Deactivate doctor',
+      cancelLabel: 'Keep active',
+      returnFocus: opener,
+    });
+    if (!confirmed) return;
+
+    setBusyId(`doctor-${doctor.id}`);
+    try {
+      const result = await deactivateDoctor(doctor.id);
+      const summary = `${plural(result.cancelledCount, 'appointment')} cancelled · ${plural(result.emailedCount, 'patient email')} sent.`;
+      toast.success(`${doctor.name} was deactivated. ${summary}`);
+      // Phone appointments have no email: their list stays on the page until closed.
+      if (result.phoneContacts.length > 0) setDeactivationResult({ ...result, doctorName: doctor.name });
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     } finally {
       setBusyId(null);
     }
   }
 
-  async function confirmDeactivate() {
-    if (!pendingDeactivation) return;
-    const { doctor } = pendingDeactivation;
-    setBusyId(`doctor-${doctor.id}`);
-    try {
-      const result = await deactivateDoctor(doctor.id);
-      setDeactivationResult({ ...result, doctorName: doctor.name });
-      setPendingDeactivation(null);
-      load();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setBusyId(null);
-    }
+  async function askCancelInvitation(inv: Invitation) {
+    const confirmed = await confirm({
+      title: 'Cancel this invitation?',
+      message: `The link sent to ${inv.email} will stop working.`,
+      confirmLabel: 'Cancel invitation',
+      cancelLabel: 'Keep invitation',
+    });
+    if (confirmed) await run(`invite-${inv.id}`, () => cancelInvitation(inv.id), 'Invitation cancelled.');
   }
 
   return (
@@ -164,30 +190,6 @@ export default function AdminDoctors() {
         actions={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite doctor</Button>}
       />
       <Alert type="error">{loadError}</Alert>
-      <Alert type="error">{error}</Alert>
-      <Alert type="success">{success}</Alert>
-
-      {pendingDeactivation && (
-        <Card tone="danger" role="alertdialog" title={`Deactivate ${pendingDeactivation.doctor.name}?`}>
-          {pendingDeactivation.upcomingCount > 0 ? (
-            <p>
-              This doctor has <strong>{plural(pendingDeactivation.upcomingCount, 'upcoming appointment')}</strong>. They will all be cancelled.
-              Patients with an account will be emailed; you will get a list of phone appointments to call.
-            </p>
-          ) : (
-            <p>This doctor has no upcoming appointments.</p>
-          )}
-          <Muted>The doctor will be logged out and can no longer log in. Past appointments stay as history. You can reactivate the account later.</Muted>
-          <FormActions>
-            <Button danger disabled={busyId !== null} onClick={confirmDeactivate}>
-              {busyId ? 'Deactivating…' : 'Deactivate doctor'}
-            </Button>
-            <Button variant="secondary" onClick={() => setPendingDeactivation(null)}>
-              Keep active
-            </Button>
-          </FormActions>
-        </Card>
-      )}
 
       {deactivationResult && (
         <Card
@@ -275,10 +277,7 @@ export default function AdminDoctors() {
                         size="sm"
                         danger
                         disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Cancel the invitation for ${inv.email}?`) &&
-                          run(`invite-${inv.id}`, () => cancelInvitation(inv.id), 'Invitation cancelled.')
-                        }
+                        onClick={() => askCancelInvitation(inv)}
                       >
                         Cancel
                       </Button>
@@ -303,47 +302,60 @@ export default function AdminDoctors() {
               {doctors.map((doctor) => {
                 const busy = busyId === `doctor-${doctor.id}`;
                 const editing = editingId === doctor.id;
+                const rowClass = [!doctor.isActive && 'row-muted', editing && 'row-editing'].filter(Boolean).join(' ') || undefined;
                 return (
-                  <tr key={doctor.id} className={doctor.isActive ? undefined : 'row-muted'}>
-                    <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
-                    <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
-                    <td>{doctor.email}</td>
-                    <td>
-                      <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
-                    </td>
-                    <ActionsCell>
-                      {editing ? (
-                        <>
-                          <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
-                            Save
-                          </Button>
-                          <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
-                            Edit
-                          </Button>
-                          {doctor.isActive ? (
-                            <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
-                              Deactivate
+                  <Fragment key={doctor.id}>
+                    <tr className={rowClass}>
+                      <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
+                      <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
+                      <td>{doctor.email}</td>
+                      <td>
+                        <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
+                      </td>
+                      <ActionsCell>
+                        {editing ? (
+                          <>
+                            <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
+                              Save
                             </Button>
-                          ) : (
-                            <Button
-                              variant="tertiary"
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
-                            >
-                              Reactivate
+                            <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
+                              Cancel
                             </Button>
-                          )}
-                        </>
-                      )}
-                    </ActionsCell>
-                  </tr>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="secondary" size="sm" onClick={() => startEdit(doctor)}>
+                              Edit
+                            </Button>
+                            {doctor.isActive ? (
+                              <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
+                                Deactivate
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="tertiary"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}
+                              >
+                                Reactivate
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </ActionsCell>
+                    </tr>
+                    {/* The bio is longer than a cell: it gets a row of its own while editing */}
+                    {editing && (
+                      <tr className="row-edit">
+                        <td colSpan={5}>
+                          <Field label="Bio" hint={`Shown to patients on the doctor's page. Optional, up to ${BIO_MAX_LENGTH} characters.`}>
+                            <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} maxLength={BIO_MAX_LENGTH} rows={3} />
+                          </Field>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </Table>

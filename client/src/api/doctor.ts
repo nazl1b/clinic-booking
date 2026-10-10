@@ -1,6 +1,6 @@
 // Endpoints for the logged-in doctor: /api/doctor/*
 
-import type { Appointment, AppointmentQuery, AvailabilityRule, Page, StaffAppointmentInput } from '../types';
+import type { Appointment, AppointmentQuery, AvailabilityRule, Page, StaffAppointmentInput, User } from '../types';
 import { MAX_PAGE_SIZE } from '../utils/limits';
 import { request, toQueryString } from './client';
 
@@ -23,6 +23,11 @@ export async function getDoctorDay(date: string): Promise<Appointment[]> {
   if (pageCount <= 1) return first.items;
   const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, i) => getDoctorAppointments({ ...query, page: i + 2 })));
   return [first, ...rest].flatMap((p) => p.items);
+}
+
+// PATCH /api/doctor/profile — the doctor's own bio (empty removes it). Returns the updated user.
+export function updateMyProfile(input: { bio: string }): Promise<User> {
+  return request('PATCH', '/doctor/profile', { body: input });
 }
 
 // GET /api/doctor/availability

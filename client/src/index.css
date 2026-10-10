@@ -3,7 +3,7 @@
  * so all panels (patient, doctor, admin) look the same. Light and dark theme.
  *
  * Design language: "Clinical Sage". Neutral surfaces, a dark forest-green
- * sidebar, one sans typeface, small radii, borders instead of shadows,
+ * sidebar, one sans typeface, small radii, borders with a very soft card shadow,
  * semantic status colours and short motion that only reacts to what the user does.
  */
 
@@ -53,7 +53,7 @@
   --radius: 8px;
   --radius-sm: 6px;
   --radius-xs: 4px;
-  --shadow: none;
+  --shadow-card: 0 1px 2px rgb(16 33 28 / 4%), 0 1px 3px rgb(16 33 28 / 5%); /* very soft, cards stand out from the page */
   --shadow-popover: 0 8px 24px rgb(16 33 28 / 12%), 0 2px 6px rgb(16 33 28 / 8%); /* dropdowns float above the page */
   --focus-ring: 0 0 0 3px rgb(31 79 67 / 22%);
   --hatch-a: #f5f6f5;
@@ -128,10 +128,17 @@
   --backdrop: rgb(0 0 0 / 60%);
   --focus-ring: 0 0 0 3px rgb(143 194 173 / 30%);
   --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 30%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 25%), 0 1px 3px rgb(0 0 0 / 20%);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Space for the scrollbar is kept even on short pages, so every page has the same
+   width and nothing moves sideways when a page (or an open dialog) shows or hides it. */
+html {
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -719,7 +726,7 @@ code {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -817,6 +824,7 @@ h1.card-title {
   min-height: 30px;
   padding: 4px 10px;
   font-size: 0.87rem;
+  gap: 6px; /* icon next to text, e.g. the back link to All doctors */
 }
 .btn-block {
   width: 100%;
@@ -933,7 +941,8 @@ h1.card-title {
 /* ================= Forms ================= */
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--surface);
@@ -948,11 +957,13 @@ select {
     box-shadow var(--ease-fast);
 }
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--primary);
 }
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: var(--focus-ring);
@@ -960,9 +971,14 @@ select:focus-visible {
 /* A field with an error message under it (aria-invalid set by Field / PasswordInput) */
 input[aria-invalid='true'],
 select[aria-invalid='true'],
+textarea[aria-invalid='true'],
 input[aria-invalid='true']:hover,
 input[aria-invalid='true']:focus-visible {
   border-color: var(--danger);
+}
+textarea {
+  line-height: 1.5;
+  resize: vertical; /* the width follows the form */
 }
 input[type='checkbox'] {
   min-height: 0;
@@ -1085,8 +1101,23 @@ input::-ms-reveal {
   padding-top: 4px;
   padding-bottom: 4px;
 }
-.page-actions input[type='search'] {
-  width: 280px;
+/* Search box: magnifying glass inside the field, on the left (SearchInput) */
+.search-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+}
+.search-input svg {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none; /* a click on the icon reaches the field */
+}
+.search-input input {
+  flex: 1;
+  min-width: 0;
+  padding-left: 36px; /* room for the icon */
 }
 
 /* Search and filters above an appointment list */
@@ -1096,6 +1127,13 @@ input::-ms-reveal {
 .filters-search {
   flex: 1 1 260px;
   min-width: 0;
+}
+/* A toolbar whose controls sit on the right (Book an appointment: search + specialty) */
+.toolbar-end {
+  justify-content: flex-end;
+}
+.toolbar-end .search-input {
+  width: 280px;
 }
 .filters .field-inline {
   gap: 8px;
@@ -1145,6 +1183,169 @@ input::-ms-reveal {
   }
   .filters .field-inline input {
     flex: 1;
+  }
+}
+
+/* ================= Toasts and confirm dialog ================= */
+
+/* Both enter by sliding down a little while fading in (ease-out) and leave the
+   same way up (ease-in); with reduced motion they only fade (bottom of this section). */
+@keyframes slide-down-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes slide-up-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes fade-only-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-only-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Toasts: top centre, newest at the bottom, above everything else */
+.toast-region {
+  position: fixed;
+  z-index: 60;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none; /* the empty space around the toasts stays clickable */
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 8px 10px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  animation: slide-down-in 200ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.toast-leaving {
+  animation: slide-up-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.toast-icon {
+  display: inline-grid;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.toast-success .toast-icon {
+  color: var(--success);
+}
+.toast-info .toast-icon {
+  color: var(--info);
+}
+.toast-error {
+  border-color: var(--danger-line);
+}
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+  font-size: 0.93rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.toast-close {
+  width: 28px;
+  height: 28px;
+  margin: -4px 0;
+  color: var(--text-muted);
+}
+.toast-close:hover {
+  color: var(--text);
+}
+
+/* Confirm dialog: dark backdrop, a small window in the middle */
+.dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--backdrop);
+  animation: fade-only-in 200ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.dialog-backdrop.dialog-leaving {
+  animation: fade-only-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.dialog {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  animation: slide-down-in 200ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.dialog-leaving .dialog {
+  animation: slide-up-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.dialog-title {
+  font-size: 1.07rem;
+}
+.dialog-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.dialog-message strong {
+  color: var(--text);
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+@media (max-width: 480px) {
+  .dialog-actions .btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* Reduced motion: fade only. !important wins over the global rule that turns
+   animations off, so the fade (which does not move anything) still plays. */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .dialog {
+    animation-name: fade-only-in;
+    animation-duration: 200ms !important;
+  }
+  .toast-leaving,
+  .dialog-leaving .dialog {
+    animation-name: fade-only-out;
+  }
+  .dialog-backdrop {
+    animation-duration: 200ms !important;
   }
 }
 
@@ -1225,6 +1426,9 @@ input::-ms-reveal {
 /* ================= Tables ================= */
 
 .table-wrap {
+  /* Contains the absolutely positioned .sr-only header labels: without it they sit
+     outside the scrolling box and make the whole page scroll sideways. */
+  position: relative;
   overflow-x: auto;
   margin: 0 -20px; /* table reaches the card edges */
 }
@@ -1309,6 +1513,13 @@ input::-ms-reveal {
 .row-block td,
 .table tbody tr.row-block:hover td {
   background: repeating-linear-gradient(-45deg, var(--hatch-a) 0 6px, var(--hatch-b) 6px 12px);
+}
+/* Admin doctors: the bio row under the doctor being edited */
+.row-editing td {
+  border-bottom: 0;
+}
+.row-edit td {
+  padding-top: 0;
 }
 .table td select,
 .table td input {
@@ -1413,15 +1624,21 @@ input::-ms-reveal {
   gap: var(--page-gap);
 }
 .doctor-card {
-  justify-content: space-between;
-  transition:
-    border-color var(--ease-fast),
-    transform var(--ease);
+  justify-content: space-between; /* no hover: only its links and buttons react */
 }
-.doctor-card:hover {
-  border-color: var(--primary-line);
-  transform: translateY(-1px);
+/* The doctor's name links to their page: a tertiary link in the title's size and weight */
+.card-title .btn-tertiary {
+  min-height: 0;
+  padding: 0;
+  font-weight: inherit;
+  white-space: normal;
+  text-align: left;
 }
+.doctor-bio {
+  white-space: pre-line; /* keeps the line breaks the doctor typed */
+}
+
+
 .doctor-card-head {
   display: flex;
   align-items: center;
@@ -1553,6 +1770,25 @@ input::-ms-reveal {
   }
 }
 
+/* Free times grouped into Morning / Afternoon / Evening (DAY_PARTS) */
+.slot-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.slot-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.slot-group-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .slot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));

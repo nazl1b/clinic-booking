@@ -5,11 +5,14 @@ import { useState, type FormEvent } from 'react';
 import { ApiError, getErrorMessage } from '../api/client';
 import type { FreeSlot } from '../api/doctors';
 import { useFieldErrors } from '../hooks/useFieldErrors';
-import type { Doctor, StaffAppointmentInput } from '../types';
+import { useToast } from '../hooks/useToast';
+import type { Doctor, StaffAppointmentInput, VisitReason } from '../types';
 import { clinicToday, formatDate } from '../utils/dates';
 import { NAME_MAX_LENGTH, NOTE_MAX_LENGTH, PHONE_MAX_LENGTH } from '../utils/limits';
+import { REASON_REQUIRED } from '../utils/reasons';
 import { plural } from '../utils/text';
 import { required } from '../utils/validation';
+import { ReasonSelect } from './ReasonSelect';
 import { SlotPicker } from './SlotPicker';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
@@ -39,22 +42,23 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
   const [slot, setSlot] = useState<FreeSlot | null>(initialSlot ?? null);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [reason, setReason] = useState<VisitReason | ''>('');
   const [blockSlots, setBlockSlots] = useState(1); // block length in slots
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const { errors, validate } = useFieldErrors<'guestName' | 'guestPhone'>();
+  const { errors, validate } = useFieldErrors<'guestName' | 'guestPhone' | 'reason'>();
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
-    setSuccess('');
-    // Patient name and phone are only on the form for a phone appointment.
+    // Patient name, phone and reason are only on the form for a phone appointment.
     const valid = validate(e.currentTarget, {
       guestName: kind === 'manual' ? required(guestName, "Please enter the patient's name.") : undefined,
       guestPhone: kind === 'manual' ? required(guestPhone, 'Please enter a phone number.') : undefined,
+      reason: kind === 'manual' ? required(reason, REASON_REQUIRED) : undefined,
     });
     if (!valid) return;
     if (selectedDoctorId === null || !slot) {
@@ -65,13 +69,14 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
     const common = { doctorId: selectedDoctorId, date, time: slot.time, note };
     try {
       if (kind === 'manual') {
-        await onSubmit({ ...common, kind, guestName, guestPhone });
-        setSuccess(`Phone appointment for ${guestName} on ${formatDate(date)} at ${slot.time} was booked.`);
+        await onSubmit({ ...common, kind, guestName, guestPhone, reason: reason as VisitReason }); // checked above
+        toast.success(`Phone appointment for ${guestName} on ${formatDate(date)} at ${slot.time} was booked.`);
         setGuestName('');
         setGuestPhone('');
+        setReason('');
       } else {
         await onSubmit({ ...common, kind, durationMinutes: blockSlots * slot.durationMinutes });
-        setSuccess(`Time blocked on ${formatDate(date)} from ${slot.time}.`);
+        toast.success(`Time blocked on ${formatDate(date)} from ${slot.time}.`);
       }
       setNote('');
       setSlot(null);
@@ -125,14 +130,19 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       )}
 
       {kind === 'manual' ? (
-        <FormRow>
-          <Field label="Patient name" error={errors.guestName}>
-            <input value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={NAME_MAX_LENGTH} />
+        <>
+          <FormRow>
+            <Field label="Patient name" error={errors.guestName}>
+              <input value={guestName} onChange={(e) => setGuestName(e.target.value)} required maxLength={NAME_MAX_LENGTH} />
+            </Field>
+            <Field label="Phone" error={errors.guestPhone}>
+              <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} required maxLength={PHONE_MAX_LENGTH} />
+            </Field>
+          </FormRow>
+          <Field label="Reason for visit" error={errors.reason}>
+            <ReasonSelect value={reason} onChange={setReason} />
           </Field>
-          <Field label="Phone" error={errors.guestPhone}>
-            <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} required maxLength={PHONE_MAX_LENGTH} />
-          </Field>
-        </FormRow>
+        </>
       ) : (
         <Field label="Length">
           <select value={blockSlots} onChange={(e) => setBlockSlots(Number(e.target.value))}>
@@ -150,7 +160,6 @@ export function StaffAppointmentForm({ doctorId, doctors, initialDate, initialSl
       </Field>
 
       <Alert type="error">{error}</Alert>
-      <Alert type="success">{success}</Alert>
 
       <FormActions>
         <Button type="submit" disabled={saving || !slot}>

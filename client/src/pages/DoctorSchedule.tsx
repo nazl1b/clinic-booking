@@ -40,7 +40,7 @@ export default function DoctorSchedule() {
   const [formStart, setFormStart] = useState<{ date: string; slot: FreeSlot } | null>(null); // from "+ Add"
 
   const reload = () => setReloadKey((k) => k + 1);
-  const { handleCancel, cancellingId, error, success, clearMessages } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
+  const { handleCancel, cancellingId } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
   const listView = params.get('view') === 'list';
 
   // All of the day's appointments plus its free times.
@@ -65,7 +65,6 @@ export default function DoctorSchedule() {
   }
 
   function setDate(d: string) {
-    clearMessages(); // a cancel message is about the day that was shown
     setParams((current) => {
       const next = new URLSearchParams(current);
       if (d === clinicToday()) next.delete('date');
@@ -118,8 +117,6 @@ export default function DoctorSchedule() {
         </div>
 
         <Alert type="error">{dayError}</Alert>
-        <Alert type="error">{error}</Alert>
-        <Alert type="success">{success}</Alert>
 
         {dayError ? null : day === null ? (
           <Muted>Loading…</Muted>

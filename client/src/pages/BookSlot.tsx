@@ -1,32 +1,44 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { bookAppointment } from '../api/appointments';
 import { ApiError, getErrorMessage } from '../api/client';
 import { getDoctors, type FreeSlot } from '../api/doctors';
+import { ReasonSelect } from '../components/ReasonSelect';
 import { SlotPicker } from '../components/SlotPicker';
+import { Icon } from '../components/layout/Icon';
 import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { FormActions } from '../components/ui/Field';
+import { Field } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
-import type { Appointment, Doctor } from '../types';
+import { useFieldErrors } from '../hooks/useFieldErrors';
+import { useToast } from '../hooks/useToast';
+import type { Doctor, VisitReason } from '../types';
 import { clinicToday, formatDate } from '../utils/dates';
+import { NOTE_MAX_LENGTH } from '../utils/limits';
+import { REASON_REQUIRED } from '../utils/reasons';
+import { required } from '../utils/validation';
 
 const backLink = (
   <ButtonLink to="/doctors" variant="tertiary" size="sm">
-    ‹ All doctors
+    <Icon name="chevronLeft" size={16} />
+    All doctors
   </ButtonLink>
 );
 
 export default function BookSlot() {
   const doctorId = Number(useParams().id);
+  const navigate = useNavigate();
+  const toast = useToast();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loadError, setLoadError] = useState('');
   const [date, setDate] = useState(clinicToday());
   const [slot, setSlot] = useState<FreeSlot | null>(null);
+  const [reason, setReason] = useState<VisitReason | ''>('');
+  const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const { errors, validate } = useFieldErrors<'reason'>();
   const [booking, setBooking] = useState(false);
-  const [booked, setBooked] = useState<Appointment | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -39,12 +51,17 @@ export default function BookSlot() {
       .catch((err) => setLoadError(getErrorMessage(err)));
   }, [doctorId]);
 
-  async function handleBook() {
+  async function handleBook(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     if (!slot) return;
     setError('');
+    if (!validate(e.currentTarget, { reason: required(reason, REASON_REQUIRED) }) || !reason) return;
     setBooking(true);
     try {
-      setBooked(await bookAppointment({ doctorId, date, time: slot.time }));
+      const booked = await bookAppointment({ doctorId, date, time: slot.time, reason, note });
+      // The new appointment is listed under Upcoming in My appointments; the toast confirms it.
+      toast.success(`You are booked with ${booked.doctorName} on ${formatDate(booked.date)} at ${booked.time}. We will email you a reminder the day before.`);
+      navigate('/appointments');
     } catch (err) {
       setError(getErrorMessage(err));
       // Someone else took the slot: refresh the list so it disappears.
@@ -74,32 +91,18 @@ export default function BookSlot() {
     );
   }
 
-  if (booked) {
-    return (
-      <div className="page">
-        <PageHeader title="Appointment booked" />
-        <Card>
-          <Alert type="success">
-            You are booked with {booked.doctorName} on {formatDate(booked.date)} at {booked.time}.
-          </Alert>
-          <Muted>We will email you a reminder the day before.</Muted>
-          <FormActions>
-            <ButtonLink to="/appointments">My appointments</ButtonLink>
-            <ButtonLink to="/doctors" variant="secondary">
-              Book another
-            </ButtonLink>
-          </FormActions>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="page">
       {backLink}
       <PageHeader title={doctor.name} description={doctor.specialty} />
-      <Card title="Choose a time">
+      <Card title="Choose a time" onSubmit={handleBook}>
         <SlotPicker doctorId={doctorId} date={date} onDateChange={setDate} selectedTime={slot?.time ?? null} onSelectTime={setSlot} reloadKey={reloadKey} />
+        <Field label="Reason for visit" error={errors.reason}>
+          <ReasonSelect value={reason} onChange={setReason} />
+        </Field>
+        <Field label="Note (optional)">
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Symptoms or questions for the doctor" maxLength={NOTE_MAX_LENGTH} />
+        </Field>
         <Alert type="error">{error}</Alert>
         <div className="summary-bar">
           {slot ? (
@@ -109,7 +112,7 @@ export default function BookSlot() {
           ) : (
             <span className="muted">Choose a time above.</span>
           )}
-          <Button disabled={!slot || booking} onClick={handleBook}>
+          <Button type="submit" disabled={!slot || booking}>
             {booking ? 'Booking…' : 'Book appointment'}
           </Button>
         </div>

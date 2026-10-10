@@ -15,6 +15,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
+import { useToast } from '../hooks/useToast';
 import type { AvailabilityRule } from '../types';
 import { CLINIC_TIMEZONE, DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
 import { checkTime, focusFirstInvalid } from '../utils/validation';
@@ -57,7 +58,7 @@ export default function Availability() {
   const [rules, setRules] = useState<AvailabilityRule[] | null>(null);
   const [openDays, setOpenDays] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [rowErrors, setRowErrors] = useState<Record<number, RowError>>({}); // by index in `rules`, checked on save
 
@@ -78,31 +79,26 @@ export default function Availability() {
 
   function updateRule(index: number, changes: Partial<AvailabilityRule>) {
     setRules((current) => current && current.map((rule, i) => (i === index ? { ...rule, ...changes } : rule)));
-    setSuccess('');
   }
 
   // One appointment length per day: changing it changes every window of the day.
   function setDaySlotMinutes(day: number, slotMinutes: number) {
     setRules((current) => current && current.map((rule) => (rule.dayOfWeek === day ? { ...rule, slotMinutes } : rule)));
-    setSuccess('');
   }
 
   function addRule(day: number) {
     setRules((current) => [...(current ?? []), newRule(day, (current ?? []).filter((r) => r.dayOfWeek === day))]);
-    setSuccess('');
   }
 
   function removeRule(index: number) {
     setRules((current) => current && current.filter((_, i) => i !== index));
     setRowErrors({}); // the indexes move
-    setSuccess('');
   }
 
   async function handleSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!rules) return;
     setError('');
-    setSuccess('');
     const found: Record<number, RowError> = {};
     rules.forEach((rule, index) => {
       const start = checkTime(rule.startTime);
@@ -123,7 +119,7 @@ export default function Availability() {
     try {
       await saveMyAvailability(rules);
       setRules(sortRules(rules));
-      setSuccess('Working hours saved. Existing appointments are kept.');
+      toast.success('Working hours saved. Existing appointments are kept.');
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -231,7 +227,6 @@ export default function Availability() {
           </div>
 
           <Alert type="error">{error}</Alert>
-          <Alert type="success">{success}</Alert>
           <FormActions>
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save working hours'}

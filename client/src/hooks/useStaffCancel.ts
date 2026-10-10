@@ -1,12 +1,15 @@
 // Cancelling an appointment (or removing blocked time) from the doctor's and the
-// admin's pages: the same question, the same messages and the same busy state
+// admin's pages: the same confirm dialog, the same toasts and the same busy state
 // everywhere. Phone appointments have no email, so the staff member is reminded
 // to call the patient.
 
 import { useState } from 'react';
 import { getErrorMessage } from '../api/client';
+import type { ConfirmOptions } from '../context/confirm';
 import type { Appointment } from '../types';
 import { formatDate } from '../utils/dates';
+import { useConfirm } from './useConfirm';
+import { useToast } from './useToast';
 
 interface Options {
   cancel: (id: number) => Promise<void>; // the doctor's or the admin's endpoint
@@ -14,13 +17,24 @@ interface Options {
   showDoctor?: boolean; // admin: name the doctor in the question
 }
 
-function question(a: Appointment, showDoctor: boolean): string {
+function question(a: Appointment, showDoctor: boolean): ConfirmOptions {
   const when = `on ${formatDate(a.date)} at ${a.time}`;
-  if (a.kind === 'block') return `Remove the blocked time${showDoctor ? ` of ${a.doctorName}` : ''} ${when}?`;
+  if (a.kind === 'block') {
+    return {
+      title: 'Remove this blocked time?',
+      message: `The blocked time${showDoctor ? ` of ${a.doctorName}` : ''} ${when} becomes free for booking again.`,
+      confirmLabel: 'Remove blocked time',
+    };
+  }
   const patient = a.kind === 'online' ? a.patientName : a.guestName;
   const who = showDoctor ? `of ${patient} with ${a.doctorName}` : `with ${patient}`;
   const notice = a.kind === 'online' ? 'The patient will be notified by email.' : `Please call the patient (${a.guestPhone}) to let them know.`;
-  return `Cancel the appointment ${who} ${when}? ${notice}`;
+  return {
+    title: 'Cancel this appointment?',
+    message: `The appointment ${who} ${when} will be cancelled. ${notice}`,
+    confirmLabel: 'Cancel appointment',
+    cancelLabel: 'Keep appointment',
+  };
 }
 
 function successMessage(a: Appointment): string {
@@ -30,30 +44,23 @@ function successMessage(a: Appointment): string {
 }
 
 export function useStaffCancel({ cancel, onCancelled, showDoctor = false }: Options) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   async function handleCancel(a: Appointment) {
-    if (!window.confirm(question(a, showDoctor))) return;
-    setError('');
-    setSuccess('');
+    if (!(await confirm(question(a, showDoctor)))) return;
     setCancellingId(a.id);
     try {
       await cancel(a.id);
-      setSuccess(successMessage(a));
+      toast.success(successMessage(a));
       onCancelled();
     } catch (err) {
-      setError(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     } finally {
       setCancellingId(null);
     }
   }
 
-  function clearMessages() {
-    setError('');
-    setSuccess('');
-  }
-
-  return { handleCancel, cancellingId, error, success, clearMessages };
+  return { handleCancel, cancellingId };
 }

@@ -1,5 +1,6 @@
 // "21–40 of 57" with Previous / Next buttons under a paged list.
 
+import { Icon } from '../layout/Icon';
 import { Button } from './Button';
 
 interface PaginationProps {
@@ -22,13 +23,15 @@ export function Pagination({ page, pageSize, total, onChange }: PaginationProps)
       </span>
       <div className="pagination-controls">
         <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          ‹ Previous
+          <Icon name="chevronLeft" size={16} />
+          Previous
         </Button>
         <span className="pagination-page tabular" aria-current="page">
           Page {page} of {pages}
         </span>
         <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>
-          Next ›
+          Next
+          <Icon name="chevronRight" size={16} />
         </Button>
       </div>
     </nav>

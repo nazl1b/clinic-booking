@@ -1,10 +1,10 @@
 // Patient appointments: /api/appointments
 import type { RequestHandler } from 'express'
-import { prisma } from '../db.js'
 import { HttpError } from '../errors.js'
-import { bookingSchema } from '../schemas/appointments.js'
+import { bookingSchema, myAppointmentsSchema } from '../schemas/appointments.js'
 import { parse, parseId } from '../schemas/validate.js'
 import { appointmentInclude, toAppointmentJson } from '../serializers.js'
+import { listPatientAppointments } from '../services/appointmentList.js'
 import { APPOINTMENT_NOT_FOUND, cancelUpcoming } from '../services/appointments.js'
 import { findSlot, inDoctorDayTransaction, lockActiveDoctor, SLOT_NOT_AVAILABLE, SLOT_TAKEN } from '../services/slots.js'
 import { dateToDb, timeToDb } from '../utils/dates.js'
@@ -14,7 +14,7 @@ import { dateToDb, timeToDb } from '../utils/dates.js'
 //   409: the time is part of the working hours but an active appointment holds it
 //   400: anything else (outside working hours, in the past, inactive doctor…)
 export const bookAppointment: RequestHandler = async (req, res) => {
-  const { doctorId, date, time } = parse(bookingSchema, req.body)
+  const { doctorId, date, time, reason, note } = parse(bookingSchema, req.body)
   const patient = req.user!
 
   const appointment = await inDoctorDayTransaction(doctorId, date, async (tx) => {
@@ -28,6 +28,8 @@ export const bookAppointment: RequestHandler = async (req, res) => {
         kind: 'online',
         patientId: patient.id,
         createdBy: patient.id,
+        reason,
+        note,
         date: dateToDb(date),
         time: timeToDb(time),
         durationMinutes: slot.durationMinutes,
@@ -38,15 +40,12 @@ export const bookAppointment: RequestHandler = async (req, res) => {
   res.status(201).json(toAppointmentJson(appointment))
 }
 
-// GET /api/appointments/mine — every appointment of the patient (upcoming, past and
-// cancelled) by date and time; the page splits them into upcoming and history.
+// GET /api/appointments/mine?view=upcoming|past&page=&pageSize=
+// One page of the patient's own appointments (10 by default) and the total.
+// upcoming: active and not started yet; past: past or cancelled.
 export const getMyAppointments: RequestHandler = async (req, res) => {
-  const appointments = await prisma.appointment.findMany({
-    where: { patientId: req.user!.id },
-    orderBy: [{ date: 'asc' }, { time: 'asc' }],
-    include: appointmentInclude,
-  })
-  res.json(appointments.map(toAppointmentJson))
+  const query = parse(myAppointmentsSchema, req.query)
+  res.json(await listPatientAppointments(req.user!.id, query))
 }
 
 // PATCH /api/appointments/:id/cancel — only the patient's own, active, upcoming appointments.

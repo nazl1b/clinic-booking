@@ -13,7 +13,7 @@ import { useStaffCancel } from '../hooks/useStaffCancel';
 
 export default function DoctorAppointments() {
   const { filters, update, clear, isFiltered, page, busy, error: loadError, reload } = useAppointmentList(getDoctorAppointments);
-  const { handleCancel, cancellingId, error, success } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
+  const { handleCancel, cancellingId } = useStaffCancel({ cancel: cancelDoctorAppointment, onCancelled: reload });
 
   return (
     <div className="page">
@@ -22,8 +22,6 @@ export default function DoctorAppointments() {
       <Card>
         <AppointmentFilters filters={filters} onChange={update} onClear={clear} isFiltered={isFiltered} />
         <Alert type="error">{loadError}</Alert>
-        <Alert type="error">{error}</Alert>
-        <Alert type="success">{success}</Alert>
         {!loadError && (
           <AppointmentResults
             page={page}

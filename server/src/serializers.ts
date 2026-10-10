@@ -32,6 +32,7 @@ export function toAppointmentJson(a: AppointmentWithNames) {
     patientName: a.patient?.name ?? null,
     guestName: a.guestName,
     guestPhone: a.guestPhone,
+    reason: a.reason, // null on blocks and on appointments made before reasons existed
     note: a.note,
     date: dateFromDb(a.date),
     time: timeFromDb(a.time),

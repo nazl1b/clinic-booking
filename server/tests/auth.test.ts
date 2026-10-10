@@ -68,7 +68,7 @@ describe('register, login, logout, me', () => {
 describe('roles', () => {
   // One endpoint per role group.
   const endpoints = {
-    patient: '/api/appointments/mine',
+    patient: '/api/appointments/mine?view=upcoming',
     doctor: '/api/doctor/availability',
     admin: '/api/admin/doctors',
   } as const

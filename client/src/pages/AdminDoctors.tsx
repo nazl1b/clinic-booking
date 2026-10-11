@@ -16,6 +16,7 @@ import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { CharacterCount } from '../components/ui/CharacterCount';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Field, FormActions, FormRow } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
@@ -25,6 +26,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { type ListFilters, usePagedList } from '../hooks/usePagedList';
 import { useToast } from '../hooks/useToast';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
 import { BIO_MAX_LENGTH, INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
@@ -69,6 +71,11 @@ export default function AdminDoctors() {
   const [editName, setEditName] = useState('');
   const [editSpecialty, setEditSpecialty] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editStart, setEditStart] = useState({ name: '', specialty: '', bio: '' }); // the values when editing began
+
+  // Unsaved changes in the invite form or the doctor being edited: leaving the page asks first.
+  useUnsavedChanges(showInvite && [inviteName, inviteSpecialty, inviteEmail].some((v) => v.trim() !== ''));
+  useUnsavedChanges(editingId !== null && (editName !== editStart.name || editSpecialty !== editStart.specialty || editBio !== editStart.bio));
 
   // Deactivation: phone appointments the admin has to call (shown until closed)
   const [deactivationResult, setDeactivationResult] = useState<(DeactivationResult & { doctorName: string }) | null>(null);
@@ -126,6 +133,7 @@ export default function AdminDoctors() {
     setEditName(doctor.name);
     setEditSpecialty(doctor.specialty);
     setEditBio(doctor.bio ?? '');
+    setEditStart({ name: doctor.name, specialty: doctor.specialty, bio: doctor.bio ?? '' });
   }
 
   async function saveEdit(doctorId: number) {
@@ -417,7 +425,14 @@ export default function AdminDoctors() {
                       {editing && (
                         <tr className="row-edit">
                           <td colSpan={5}>
-                            <Field label="Bio" hint={`Shown to patients on the doctor's page. Optional, up to ${BIO_MAX_LENGTH} characters.`}>
+                            <Field
+                              label="Bio"
+                              hint={
+                                <>
+                                  Shown to patients on the doctor's page. <CharacterCount length={editBio.length} max={BIO_MAX_LENGTH} />
+                                </>
+                              }
+                            >
                               <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} maxLength={BIO_MAX_LENGTH} rows={3} />
                             </Field>
                           </td>

@@ -6,6 +6,7 @@ import { ApiError, getErrorMessage } from '../api/client';
 import type { FreeSlot } from '../api/doctors';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import type { Doctor, StaffAppointmentInput, VisitReason } from '../types';
 import { clinicToday, formatDate, formatDuration, fromMinutes, toMinutes } from '../utils/dates';
 import { NAME_MAX_LENGTH, NOTE_MAX_LENGTH, PHONE_MAX_LENGTH } from '../utils/limits';
@@ -66,6 +67,8 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const { errors, validate } = useFieldErrors<'guestName' | 'guestPhone' | 'reason'>();
+  // A chosen time or anything typed, not saved yet: leaving the page (also Cancel) asks first.
+  const allowLeaving = useUnsavedChanges(slot !== null || [guestName, guestPhone, reason, note].some((v) => v.trim() !== ''));
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -91,6 +94,7 @@ export function StaffAppointmentForm({ doctorId, doctors, onSubmit, onSaved, onC
         await onSubmit({ ...common, kind, durationMinutes: blockSlots * slot.durationMinutes });
         toast.success(`Time blocked on ${formatDate(date)} from ${slot.time}.`);
       }
+      allowLeaving();
       onSaved();
     } catch (err) {
       setError(getErrorMessage(err));

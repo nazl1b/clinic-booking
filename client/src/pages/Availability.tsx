@@ -5,9 +5,8 @@
 // (accordion) to edit its hours. All days are saved together; leaving the page
 // with unsaved changes asks first.
 
-import { Fragment, useEffect, useRef, useState, type ComponentProps, type FormEvent } from 'react';
+import { Fragment, useEffect, useState, type ComponentProps, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { useBlocker } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
 import { getMyAvailability, saveMyAvailability } from '../api/doctor';
 import { Icon } from '../components/layout/Icon';
@@ -17,8 +16,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
-import { useConfirm } from '../hooks/useConfirm';
 import { useToast } from '../hooks/useToast';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import type { AvailabilityRule } from '../types';
 import { CLINIC_TIMEZONE, DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
 import { focusFirstInvalid } from '../utils/validation';
@@ -131,7 +130,6 @@ export default function Availability() {
   const [openDays, setOpenDays] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
   const toast = useToast();
-  const confirm = useConfirm();
   const [saving, setSaving] = useState(false);
   const [rowErrors, setRowErrors] = useState<Record<number, RowError>>({}); // by index in `rules`, checked on save
 
@@ -144,33 +142,8 @@ export default function Availability() {
       .catch((err) => setError(getErrorMessage(err)));
   }, []);
 
-  // Unsaved changes: ask before leaving the page (links, sidebar, Back button)…
-  const dirty = rules !== null && scheduleKey(rules) !== savedKey;
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      dirty && currentLocation.pathname !== nextLocation.pathname && nextLocation.pathname !== '/login', // logging out never asks
-  );
-  const blockerRef = useRef(blocker);
-  useEffect(() => {
-    blockerRef.current = blocker;
-  });
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return;
-    confirm({
-      title: 'Unsaved changes',
-      message: 'You have unsaved changes. Leave without saving?',
-      confirmLabel: 'Leave without saving',
-      cancelLabel: 'Stay on this page',
-    }).then((leave) => (leave ? blockerRef.current.proceed?.() : blockerRef.current.reset?.()));
-  }, [blocker.state, confirm]);
-
-  // …and the browser's own warning on refresh or closing the tab.
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  // Unsaved changes: leaving the page asks first.
+  useUnsavedChanges(rules !== null && scheduleKey(rules) !== savedKey);
 
   function toggleDay(day: number) {
     setOpenDays((current) => {

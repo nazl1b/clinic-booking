@@ -7,6 +7,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import type { Role } from '../../types';
 import { ROLE_LABELS } from '../../utils/roles';
+import { UnsavedChangesProvider } from '../UnsavedChangesProvider';
 import { Icon, type IconName } from './Icon';
 import { UserMenu } from './UserMenu';
 
@@ -104,7 +105,9 @@ export function AppLayout() {
         </header>
 
         <main className="content">
-          <Outlet />
+          <UnsavedChangesProvider>
+            <Outlet />
+          </UnsavedChangesProvider>
         </main>
       </div>
     </div>

@@ -6,12 +6,14 @@ import { updateMyProfile } from '../api/doctor';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { CharacterCount } from '../components/ui/CharacterCount';
 import { Field, FormActions } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { useAuth } from '../hooks/useAuth';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { BIO_MAX_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_HINT } from '../utils/limits';
 import { ROLE_LABELS } from '../utils/roles';
 import { checkConfirmPassword, checkNewPassword, required } from '../utils/validation';
@@ -27,6 +29,8 @@ function BioCard({ bio }: { bio: string | null }) {
   const [error, setError] = useState('');
   const toast = useToast();
   const [saving, setSaving] = useState(false);
+  // The server trims the bio, so spaces at the ends are no change.
+  useUnsavedChanges(value.trim() !== (bio ?? '').trim());
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,7 +49,10 @@ function BioCard({ bio }: { bio: string | null }) {
 
   return (
     <Card title="About you" description="Patients read this on your page before they book." onSubmit={handleSubmit}>
-      <Field label="Bio" hint={`Optional, up to ${BIO_MAX_LENGTH} characters.`}>
+      <Field
+        label="Bio"
+        hint={<CharacterCount length={value.length} max={BIO_MAX_LENGTH} />}
+      >
         <textarea value={value} onChange={(e) => setValue(e.target.value)} maxLength={BIO_MAX_LENGTH} rows={4} />
       </Field>
       <Alert type="error">{error}</Alert>
@@ -69,6 +76,7 @@ export default function Profile() {
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const { errors, validate } = useFieldErrors<'currentPassword' | 'newPassword' | 'confirm'>();
+  useUnsavedChanges([currentPassword, newPassword, confirm].some((v) => v !== ''));
 
   // Coming from "Change password": scroll to the form and focus its first field.
   // location.key makes it run again when the link is used while already here.
@@ -106,7 +114,7 @@ export default function Profile() {
 
   return (
     <div className="page">
-      <PageHeader title="Profile" description="Your account details and password." />
+      <PageHeader title="Profile" description={user.role === 'doctor' ? 'Your account details, bio and password.' : 'Your account details and password.'} />
 
       <Card title="Your details">
         <dl className="details">

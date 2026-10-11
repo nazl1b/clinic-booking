@@ -13,6 +13,7 @@ import { Field } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { useFieldErrors } from '../hooks/useFieldErrors';
 import { useToast } from '../hooks/useToast';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import type { Doctor, VisitReason } from '../types';
 import { clinicToday, formatDate } from '../utils/dates';
 import { NOTE_MAX_LENGTH } from '../utils/limits';
@@ -40,6 +41,8 @@ export default function BookSlot() {
   const { errors, validate } = useFieldErrors<'reason'>();
   const [booking, setBooking] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // A chosen time, reason or note not booked yet: leaving the page asks first.
+  const allowLeaving = useUnsavedChanges(slot !== null || reason !== '' || note.trim() !== '');
 
   useEffect(() => {
     getDoctors()
@@ -61,6 +64,7 @@ export default function BookSlot() {
       const booked = await bookAppointment({ doctorId, date, time: slot.time, reason, note });
       // The new appointment is listed under Upcoming in My appointments; the toast confirms it.
       toast.success(`You are booked with ${booked.doctorName} on ${formatDate(booked.date)} at ${booked.time}. We will email you a reminder the day before.`);
+      allowLeaving();
       navigate('/appointments');
     } catch (err) {
       setError(getErrorMessage(err));

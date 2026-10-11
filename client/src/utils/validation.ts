@@ -1,6 +1,6 @@
 // Checks run when a form is submitted. Forms set noValidate (see Card), so these
 // replace the browser's own bubbles: the same checks it made (required, email,
-// minimum length, time steps) plus "passwords match", with our messages under
+// minimum length) plus "passwords match", with our messages under
 // each field. The server checks everything again.
 // Each check returns the message to show, or undefined when the value is fine.
 
@@ -29,13 +29,6 @@ export function checkNewPassword(value: string): string | undefined {
 export function checkConfirmPassword(value: string, password: string): string | undefined {
   if (!value) return 'Please enter the password again.';
   if (value !== password) return PASSWORD_MISMATCH;
-  return undefined;
-}
-
-// Time inputs use 5-minute steps (step={300}), as the browser used to enforce.
-export function checkTime(value: string): string | undefined {
-  if (!value) return 'Please fill in both times.';
-  if (Number(value.slice(3, 5)) % 5 !== 0) return 'Please use 5-minute steps, e.g. 09:05.';
   return undefined;
 }
 

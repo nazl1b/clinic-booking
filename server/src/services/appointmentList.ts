@@ -53,7 +53,8 @@ export async function listAppointments(query: AppointmentListQuery, scope: { doc
   const page = query.page ?? 1
   const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE
 
-  const filters: Prisma.AppointmentWhereInput[] = []
+  // A cancelled block is just time that became free again: never listed.
+  const filters: Prisma.AppointmentWhereInput[] = [{ NOT: { kind: 'block', status: 'cancelled' } }]
   if (doctorId !== undefined) filters.push({ doctorId })
   if (query.status) filters.push({ status: query.status })
   if (query.kind) filters.push({ kind: query.kind })

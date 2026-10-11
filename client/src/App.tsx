@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { GuestOnly, RequireRole } from './components/RequireRole';
@@ -53,51 +53,57 @@ function NotFound() {
   );
 }
 
+// A data router (not <BrowserRouter>), so pages can block leaving with unsaved
+// changes (useBlocker, e.g. Working hours).
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      {/* Pages without sidebar (404 is at the end) */}
+      <Route element={<AuthLayout />}>
+        <Route path="login" element={<GuestOnly><Login /></GuestOnly>} />
+        <Route path="register" element={<GuestOnly><Register /></GuestOnly>} />
+        <Route path="forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+        <Route path="reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
+        {/* Not GuestOnly: a logged-in user is asked to log out first */}
+        <Route path="accept-invite" element={<AcceptInvite />} />
+      </Route>
+
+      {/* Logged-in pages: sidebar + top bar */}
+      <Route element={<RequireRole><AppLayout /></RequireRole>}>
+        <Route index element={<Home />} />
+        <Route path="profile" element={<Profile />} />
+
+        {/* Patient */}
+        <Route path="doctors" element={<RequireRole roles={['patient']}><Doctors /></RequireRole>} />
+        <Route path="doctors/:id" element={<RequireRole roles={['patient']}><DoctorProfile /></RequireRole>} />
+        <Route path="doctors/:id/book" element={<RequireRole roles={['patient']}><BookSlot /></RequireRole>} />
+        <Route path="appointments" element={<RequireRole roles={['patient']}><MyAppointments /></RequireRole>} />
+
+        {/* Doctor */}
+        <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
+        <Route path="doctor/schedule/new" element={<RequireRole roles={['doctor']}><NewStaffAppointment /></RequireRole>} />
+        <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
+        <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
+
+        {/* Admin */}
+        <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
+        <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
+        <Route path="admin/appointments/new" element={<RequireRole roles={['admin']}><NewStaffAppointment /></RequireRole>} />
+      </Route>
+
+      <Route element={<NotFoundLayout />}>
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </>,
+  ),
+);
+
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Pages without sidebar (404 is at the end) */}
-              <Route element={<AuthLayout />}>
-                <Route path="login" element={<GuestOnly><Login /></GuestOnly>} />
-                <Route path="register" element={<GuestOnly><Register /></GuestOnly>} />
-                <Route path="forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
-                <Route path="reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
-                {/* Not GuestOnly: a logged-in user is asked to log out first */}
-                <Route path="accept-invite" element={<AcceptInvite />} />
-              </Route>
-
-              {/* Logged-in pages: sidebar + top bar */}
-              <Route element={<RequireRole><AppLayout /></RequireRole>}>
-                <Route index element={<Home />} />
-                <Route path="profile" element={<Profile />} />
-
-                {/* Patient */}
-                <Route path="doctors" element={<RequireRole roles={['patient']}><Doctors /></RequireRole>} />
-                <Route path="doctors/:id" element={<RequireRole roles={['patient']}><DoctorProfile /></RequireRole>} />
-                <Route path="doctors/:id/book" element={<RequireRole roles={['patient']}><BookSlot /></RequireRole>} />
-                <Route path="appointments" element={<RequireRole roles={['patient']}><MyAppointments /></RequireRole>} />
-
-                {/* Doctor */}
-                <Route path="doctor/schedule" element={<RequireRole roles={['doctor']}><DoctorSchedule /></RequireRole>} />
-                <Route path="doctor/schedule/new" element={<RequireRole roles={['doctor']}><NewStaffAppointment /></RequireRole>} />
-                <Route path="doctor/appointments" element={<RequireRole roles={['doctor']}><DoctorAppointments /></RequireRole>} />
-                <Route path="doctor/availability" element={<RequireRole roles={['doctor']}><Availability /></RequireRole>} />
-
-                {/* Admin */}
-                <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
-                <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
-                <Route path="admin/appointments/new" element={<RequireRole roles={['admin']}><NewStaffAppointment /></RequireRole>} />
-              </Route>
-
-              <Route element={<NotFoundLayout />}>
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
+          <RouterProvider router={router} />
         </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>

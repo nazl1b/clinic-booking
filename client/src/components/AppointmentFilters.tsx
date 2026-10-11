@@ -32,7 +32,6 @@ export function AppointmentFilters({ filters, onChange, onClear, isFiltered, doc
         placeholder="Search patient name, phone or email"
       />
       <select value={filters.status} onChange={(e) => onChange({ status: e.target.value as Filters['status'] })} aria-label="Status">
-        <option value="">All statuses</option>
         <option value="active">Active</option>
         <option value="cancelled">Cancelled</option>
       </select>

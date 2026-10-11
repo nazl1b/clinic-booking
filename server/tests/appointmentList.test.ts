@@ -87,6 +87,23 @@ describe('filters and search', () => {
   })
 })
 
+describe('cancelled blocked time', () => {
+  it('is never listed, whatever the filters', async () => {
+    const blocks = await createUser({ role: 'doctor' })
+    const agent = await loginAs(blocks.email)
+    await insertAppointment({ doctorId: blocks.id, date: inDays(12), time: '09:00', kind: 'block', status: 'cancelled' })
+    await insertAppointment({ doctorId: blocks.id, date: inDays(12), time: '10:00', kind: 'block' })
+    await insertAppointment({ doctorId: blocks.id, date: inDays(12), time: '11:00', kind: 'manual', guestName: 'Cancelled Guest', guestPhone: '6970000001', status: 'cancelled' })
+
+    const times = async (query: string) => ((await agent.get(`/api/doctor/appointments${query}`)).body.items as { time: string }[]).map((a) => a.time)
+    expect(await times('')).toEqual(['10:00', '11:00'])
+    expect(await times('?status=cancelled')).toEqual(['11:00'])
+    expect(await times('?kind=block')).toEqual(['10:00'])
+    expect(await times('?kind=block&status=cancelled')).toEqual([])
+    expect((await admin.get(`/api/admin/appointments?doctor=${blocks.id}`)).body.total).toBe(2)
+  })
+})
+
 describe("the patient's own lists", () => {
   let patient: Awaited<ReturnType<typeof createUser>>
   let agent: Agent

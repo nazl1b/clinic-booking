@@ -1,5 +1,5 @@
 // Search, filters and page of an appointment list, kept in the URL
-// (?search=maria&status=active&page=2), so a refresh, a shared link or the
+// (?search=maria&status=cancelled&page=2), so a refresh, a shared link or the
 // Back button shows the same list. Other params (e.g. `view`) are left alone.
 
 import { useCallback, useMemo } from 'react';
@@ -9,7 +9,7 @@ import { clinicToday, isIsoDate } from '../utils/dates';
 
 export interface AppointmentFilters {
   search: string;
-  status: AppointmentStatus | '';
+  status: AppointmentStatus; // 'active' by default: cancelled ones only when asked for
   kind: AppointmentKind | '';
   from: string; // '' = no lower bound
   to: string; // '' = no upper bound
@@ -18,12 +18,10 @@ export interface AppointmentFilters {
 }
 
 const FILTER_PARAMS = ['search', 'status', 'kind', 'from', 'to', 'doctor', 'page'];
-const STATUSES: AppointmentStatus[] = ['active', 'cancelled'];
 const KINDS: AppointmentKind[] = ['online', 'manual', 'block'];
 
 // Without a `from` param the list starts today; `from=` (empty) means no lower bound.
 function parse(params: URLSearchParams): AppointmentFilters {
-  const status = params.get('status') as AppointmentStatus;
   const kind = params.get('kind') as AppointmentKind;
   const from = params.get('from');
   const to = params.get('to') ?? '';
@@ -31,7 +29,7 @@ function parse(params: URLSearchParams): AppointmentFilters {
   const page = Number(params.get('page'));
   return {
     search: params.get('search') ?? '',
-    status: STATUSES.includes(status) ? status : '',
+    status: params.get('status') === 'cancelled' ? 'cancelled' : 'active',
     kind: KINDS.includes(kind) ? kind : '',
     from: from === null ? clinicToday() : isIsoDate(from) ? from : '',
     to: isIsoDate(to) ? to : '',
@@ -43,7 +41,7 @@ function parse(params: URLSearchParams): AppointmentFilters {
 export function toAppointmentQuery(filters: AppointmentFilters): AppointmentQuery {
   return {
     search: filters.search.trim() || undefined,
-    status: filters.status || undefined,
+    status: filters.status,
     kind: filters.kind || undefined,
     from: filters.from || undefined,
     to: filters.to || undefined,
@@ -66,7 +64,7 @@ export function useAppointmentFilters() {
         const next = new URLSearchParams(current);
         const write = (name: string, value: string | null) => (value === null ? next.delete(name) : next.set(name, value));
         if ('search' in changes) write('search', changes.search?.trim() || null);
-        if ('status' in changes) write('status', changes.status || null);
+        if ('status' in changes) write('status', changes.status === 'cancelled' ? 'cancelled' : null); // active is the default
         if ('kind' in changes) write('kind', changes.kind || null);
         if ('from' in changes) write('from', changes.from === clinicToday() ? null : (changes.from ?? '')); // today is the default
         if ('to' in changes) write('to', changes.to || null);

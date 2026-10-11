@@ -32,10 +32,11 @@ function rowClass(a: Appointment, status: { label: string }): string | undefined
   return classes.length ? classes.join(' ') : undefined;
 }
 
-const KIND: Record<Appointment['kind'], { label: string; tone: BadgeTone }> = {
-  online: { label: 'Online', tone: 'primary' },
-  manual: { label: 'Phone', tone: 'info' },
-  block: { label: 'Blocked', tone: 'warning' },
+// Type badges are neutral: only the Status column uses colour.
+const KIND_LABELS: Record<Appointment['kind'], string> = {
+  online: 'Online',
+  manual: 'Phone',
+  block: 'Blocked',
 };
 
 function statusOf(a: Appointment): { label: string; tone: BadgeTone } {
@@ -115,7 +116,7 @@ export function AppointmentTable({
             {showPatient && <td>{patientCell(a)}</td>}
             {showType && (
               <td>
-                <Badge tone={KIND[a.kind].tone}>{KIND[a.kind].label}</Badge>
+                <Badge tone="neutral">{KIND_LABELS[a.kind]}</Badge>
               </td>
             )}
             <td>{reasonCell(a)}</td>

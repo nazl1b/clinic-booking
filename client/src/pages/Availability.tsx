@@ -2,10 +2,12 @@
 // allowed (e.g. 09:00–13:00 and 17:00–20:00), all with the same appointment
 // length (the server refuses different lengths on one day).
 // Each day is one collapsed line with a summary; clicking it opens the day
-// (accordion) to edit its hours. All days are saved together.
+// (accordion) to edit its hours. All days are saved together; leaving the page
+// with unsaved changes asks first.
 
-import { Fragment, useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type ComponentProps, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
+import { useBlocker } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
 import { getMyAvailability, saveMyAvailability } from '../api/doctor';
 import { Icon } from '../components/layout/Icon';
@@ -15,14 +17,16 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { FormActions } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
+import { useConfirm } from '../hooks/useConfirm';
 import { useToast } from '../hooks/useToast';
 import type { AvailabilityRule } from '../types';
 import { CLINIC_TIMEZONE, DAY_NAMES, fromMinutes, toMinutes } from '../utils/dates';
-import { checkTime, focusFirstInvalid } from '../utils/validation';
+import { focusFirstInvalid } from '../utils/validation';
+import { FIRST_TIME, LAST_TIME, SLOT_OPTIONS, timeOptions, timeStepFor } from '../utils/workingHours';
 
 // Monday first, as in a Greek calendar.
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
-const SLOT_OPTIONS = [10, 15, 20, 30, 45, 60];
+const WEEKDAYS = [1, 2, 3, 4, 5]; // Monday–Friday, for "Copy to all weekdays"
 
 // Problem with one row of hours: the message and which of its two times is wrong.
 interface RowError {
@@ -31,42 +35,142 @@ interface RowError {
   end: boolean;
 }
 
+const byStart = (a: AvailabilityRule, b: AvailabilityRule) => a.startTime.localeCompare(b.startTime);
+
 function sortRules(rules: AvailabilityRule[]): AvailabilityRule[] {
-  return [...rules].sort(
-    (a, b) => WEEK_ORDER.indexOf(a.dayOfWeek) - WEEK_ORDER.indexOf(b.dayOfWeek) || a.startTime.localeCompare(b.startTime),
-  );
+  return [...rules].sort((a, b) => WEEK_ORDER.indexOf(a.dayOfWeek) - WEEK_ORDER.indexOf(b.dayOfWeek) || byStart(a, b));
 }
+
+// Same hours in any order count as no change.
+const scheduleKey = (rules: AvailabilityRule[]) => JSON.stringify(sortRules(rules));
 
 // "08:00–14:00, 15:00–20:00 · 30 min"
 function daySummary(rules: AvailabilityRule[]): string {
-  const sorted = [...rules].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const hours = sorted.map((r) => `${r.startTime || '--:--'}–${r.endTime || '--:--'}`).join(', ');
+  const sorted = [...rules].sort(byStart);
+  const hours = sorted.map((r) => `${r.startTime}–${r.endTime}`).join(', ');
   return `${hours} · ${sorted[0].slotMinutes} min`;
 }
 
-// New hours for a day: after the day's last window if it has one, else a morning.
-function newRule(day: number, existing: AvailabilityRule[]): AvailabilityRule {
-  const fallback = { dayOfWeek: day, startTime: '09:00', endTime: '14:00', slotMinutes: existing.at(-1)?.slotMinutes ?? 30 };
-  const lastEnd = Math.max(0, ...existing.map((r) => (r.endTime ? toMinutes(r.endTime) : 0)));
-  if (lastEnd === 0) return fallback;
-  const start = lastEnd + 60;
-  const end = Math.min(start + 5 * 60, 23 * 60 + 55);
-  return start < end ? { ...fallback, startTime: fromMinutes(start), endTime: fromMinutes(end) } : fallback;
+// New hours for a day. A closed day gets a morning. Otherwise the latest free time
+// of the day that holds at least one appointment, usually after the last hours
+// (with an hour's break), up to 5 hours long. Null when the day has no room left.
+function newRule(day: number, existing: AvailabilityRule[]): AvailabilityRule | null {
+  const slotMinutes = existing[0]?.slotMinutes ?? 30;
+  if (existing.length === 0) return { dayOfWeek: day, startTime: '09:00', endTime: '14:00', slotMinutes };
+
+  const first = toMinutes(FIRST_TIME);
+  const last = toMinutes(LAST_TIME);
+  const step = timeStepFor(slotMinutes);
+  const onGrid = (minutes: number, round: (x: number) => number) => first + round((minutes - first) / step) * step;
+
+  // Free stretches of the day between FIRST_TIME and LAST_TIME.
+  const taken = existing.map((r) => [toMinutes(r.startTime), toMinutes(r.endTime)] as const).sort((a, b) => a[0] - b[0]);
+  const gaps: [number, number][] = [];
+  let cursor = first;
+  for (const [start, end] of taken) {
+    if (start > cursor) gaps.push([cursor, start]);
+    cursor = Math.max(cursor, end);
+  }
+  if (cursor < last) gaps.push([cursor, last]);
+
+  for (const [gapStart, gapEnd] of gaps.reverse()) {
+    let start = onGrid(gapStart, Math.ceil);
+    const end = onGrid(gapEnd, Math.floor);
+    if (end - start < slotMinutes) continue;
+    if (gapStart > first && end - (start + 60) >= slotMinutes) start += 60; // a break after the hours before
+    return { dayOfWeek: day, startTime: fromMinutes(start), endTime: fromMinutes(Math.min(start + 5 * 60, end)), slotMinutes };
+  }
+  return null;
+}
+
+// Problems found on save, by index in `rules`: the end before the start, hours
+// shorter than one appointment, and hours that overlap (or repeat) earlier hours
+// of the same day. The server checks the same.
+function checkRules(rules: AvailabilityRule[]): Record<number, RowError> {
+  const found: Record<number, RowError> = {};
+  rules.forEach((rule, index) => {
+    const start = toMinutes(rule.startTime);
+    const end = toMinutes(rule.endTime);
+    if (start >= end) found[index] = { message: 'The end must be after the start.', start: false, end: true };
+    else if (end - start < rule.slotMinutes) found[index] = { message: `Working hours must be at least one appointment (${rule.slotMinutes} min) long.`, start: false, end: true };
+  });
+  for (const day of WEEK_ORDER) {
+    const entries = rules.map((rule, index) => ({ rule, index })).filter((e) => e.rule.dayOfWeek === day).sort((a, b) => byStart(a.rule, b.rule));
+    entries.forEach(({ rule, index }, i) => {
+      if (found[index]) return;
+      const earlier = entries.slice(0, i).find(({ rule: other }) => toMinutes(other.startTime) < toMinutes(rule.endTime) && toMinutes(rule.startTime) < toMinutes(other.endTime));
+      if (!earlier) return;
+      const same = earlier.rule.startTime === rule.startTime && earlier.rule.endTime === rule.endTime;
+      const message = same ? 'These hours are already on this day.' : `These hours overlap ${earlier.rule.startTime}–${earlier.rule.endTime}.`;
+      found[index] = { message, start: true, end: true };
+    });
+  }
+  return found;
+}
+
+// A start or end time: only the offered times (24-hour clock). A saved time that is
+// not one of them (e.g. after changing the appointment length) is still shown.
+function TimeSelect({ value, slotMinutes, onChange, ...rest }: Omit<ComponentProps<'select'>, 'value' | 'onChange'> & { value: string; slotMinutes: number; onChange: (time: string) => void }) {
+  const options = timeOptions(slotMinutes);
+  if (!options.includes(value)) options.push(value);
+  options.sort();
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} {...rest}>
+      {options.map((time) => (
+        <option key={time} value={time}>
+          {time}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export default function Availability() {
   const [rules, setRules] = useState<AvailabilityRule[] | null>(null);
+  const [savedKey, setSavedKey] = useState(''); // the schedule as last loaded or saved
   const [openDays, setOpenDays] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
   const toast = useToast();
+  const confirm = useConfirm();
   const [saving, setSaving] = useState(false);
   const [rowErrors, setRowErrors] = useState<Record<number, RowError>>({}); // by index in `rules`, checked on save
 
   useEffect(() => {
     getMyAvailability()
-      .then((result) => setRules(sortRules(result)))
+      .then((result) => {
+        setRules(sortRules(result));
+        setSavedKey(scheduleKey(result));
+      })
       .catch((err) => setError(getErrorMessage(err)));
   }, []);
+
+  // Unsaved changes: ask before leaving the page (links, sidebar, Back button)…
+  const dirty = rules !== null && scheduleKey(rules) !== savedKey;
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname && nextLocation.pathname !== '/login', // logging out never asks
+  );
+  const blockerRef = useRef(blocker);
+  useEffect(() => {
+    blockerRef.current = blocker;
+  });
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    confirm({
+      title: 'Unsaved changes',
+      message: 'You have unsaved changes. Leave without saving?',
+      confirmLabel: 'Leave without saving',
+      cancelLabel: 'Stay on this page',
+    }).then((leave) => (leave ? blockerRef.current.proceed?.() : blockerRef.current.reset?.()));
+  }, [blocker.state, confirm]);
+
+  // …and the browser's own warning on refresh or closing the tab.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   function toggleDay(day: number) {
     setOpenDays((current) => {
@@ -87,7 +191,12 @@ export default function Availability() {
   }
 
   function addRule(day: number) {
-    setRules((current) => [...(current ?? []), newRule(day, (current ?? []).filter((r) => r.dayOfWeek === day))]);
+    const rule = newRule(day, (rules ?? []).filter((r) => r.dayOfWeek === day));
+    if (!rule) {
+      toast.error(`There is no free time left on ${DAY_NAMES[day]} between ${FIRST_TIME} and ${LAST_TIME}.`);
+      return;
+    }
+    setRules((current) => [...(current ?? []), rule]);
   }
 
   function removeRule(index: number) {
@@ -95,18 +204,25 @@ export default function Availability() {
     setRowErrors({}); // the indexes move
   }
 
+  // This day's hours and appointment length replace those of the other weekdays (Mon–Fri).
+  function copyToWeekdays(day: number) {
+    setRules((current) => {
+      if (!current) return current;
+      const source = current.filter((r) => r.dayOfWeek === day);
+      const targets = WEEKDAYS.filter((d) => d !== day);
+      return sortRules([...current.filter((r) => !targets.includes(r.dayOfWeek)), ...targets.flatMap((d) => source.map((r) => ({ ...r, dayOfWeek: d })))]);
+    });
+    setRowErrors({}); // the indexes move
+    toast.success(`${DAY_NAMES[day]}'s hours were copied to all weekdays (Monday–Friday). Save to keep them.`);
+  }
+
   async function handleSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!rules) return;
     setError('');
-    const found: Record<number, RowError> = {};
-    rules.forEach((rule, index) => {
-      const start = checkTime(rule.startTime);
-      const end = checkTime(rule.endTime);
-      if (start || end) found[index] = { message: (start ?? end)!, start: Boolean(start), end: Boolean(end) };
-    });
+    const found = checkRules(rules);
     const daysWithErrors = Object.keys(found).map((index) => rules[Number(index)].dayOfWeek);
-    // Open the days with a problem (a collapsed day has no inputs to focus), then focus the first one.
+    // Open the days with a problem (a collapsed day has no fields to focus), then focus the first one.
     flushSync(() => {
       setRowErrors(found);
       if (daysWithErrors.length > 0) setOpenDays((current) => new Set([...current, ...daysWithErrors]));
@@ -119,6 +235,7 @@ export default function Availability() {
     try {
       await saveMyAvailability(rules);
       setRules(sortRules(rules));
+      setSavedKey(scheduleKey(rules));
       toast.success('Working hours saved. Existing appointments are kept.');
     } catch (err) {
       setError(getErrorMessage(err));
@@ -137,8 +254,11 @@ export default function Availability() {
         <Card title="Weekly schedule" description="Click a day to change its hours." onSubmit={handleSave}>
           <div className="day-list">
             {WEEK_ORDER.map((day) => {
-              // Keep each rule's index in `rules`, so edits go to the right one.
-              const entries = rules.map((rule, index) => ({ rule, index })).filter((e) => e.rule.dayOfWeek === day);
+              // Keep each rule's index in `rules`, so edits go to the right one; shown by start time.
+              const entries = rules
+                .map((rule, index) => ({ rule, index }))
+                .filter((e) => e.rule.dayOfWeek === day)
+                .sort((a, b) => byStart(a.rule, b.rule));
               const isOpen = openDays.has(day);
               const working = entries.length > 0;
               const bodyId = `day-${day}-hours`;
@@ -176,12 +296,10 @@ export default function Availability() {
                           return (
                             <Fragment key={index}>
                               <div className="hours-row">
-                                <input
-                                  type="time"
+                                <TimeSelect
                                   value={rule.startTime}
-                                  step={300}
-                                  required
-                                  onChange={(e) => updateRule(index, { startTime: e.target.value })}
+                                  slotMinutes={rule.slotMinutes}
+                                  onChange={(startTime) => updateRule(index, { startTime })}
                                   aria-label={`${DAY_NAMES[day]} from`}
                                   aria-invalid={rowError?.start || undefined}
                                   aria-describedby={rowError ? errorId : undefined}
@@ -189,12 +307,10 @@ export default function Availability() {
                                 <span className="hours-sep" aria-hidden="true">
                                   –
                                 </span>
-                                <input
-                                  type="time"
+                                <TimeSelect
                                   value={rule.endTime}
-                                  step={300}
-                                  required
-                                  onChange={(e) => updateRule(index, { endTime: e.target.value })}
+                                  slotMinutes={rule.slotMinutes}
+                                  onChange={(endTime) => updateRule(index, { endTime })}
                                   aria-label={`${DAY_NAMES[day]} to`}
                                   aria-invalid={rowError?.end || undefined}
                                   aria-describedby={rowError ? errorId : undefined}
@@ -214,10 +330,15 @@ export default function Availability() {
                       ) : (
                         <Muted>Closed. Add hours to let patients book on {DAY_NAMES[day]}s.</Muted>
                       )}
-                      <div>
+                      <div className="button-group">
                         <Button variant="tertiary" size="sm" onClick={() => addRule(day)}>
                           + Add hours
                         </Button>
+                        {working && (
+                          <Button variant="tertiary" size="sm" onClick={() => copyToWeekdays(day)}>
+                            Copy to all weekdays
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}

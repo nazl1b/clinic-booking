@@ -1,19 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
 import { getDoctors } from '../api/doctors';
+import { FilterToolbar } from '../components/FilterToolbar';
 import { Alert } from '../components/ui/Alert';
 import { Button, ButtonLink } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Field } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
-import { SearchInput } from '../components/ui/SearchInput';
 import type { Doctor } from '../types';
 import { initialOf } from '../utils/text';
 
 export default function Doctors() {
   const [doctors, setDoctors] = useState<Doctor[] | null>(null);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [specialty, setSpecialty] = useState(''); // '' = all specialties
+  // Search and specialty are in the URL (?search=…&specialty=…), like the other lists.
+  const [params, setParams] = useSearchParams();
+  const search = params.get('search') ?? '';
+  const specialty = params.get('specialty') ?? ''; // '' = all specialties
+  const setParam = useCallback(
+    (name: 'search' | 'specialty', value: string, options: { replace?: boolean } = {}) =>
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (value.trim()) next.set(name, value.trim());
+          else next.delete(name);
+          return next;
+        },
+        { replace: options.replace },
+      ),
+    [setParams],
+  );
+  const onSearch = useCallback((value: string) => setParam('search', value, { replace: true }), [setParam]);
+  const clearAll = () => setParams((current) => {
+    const next = new URLSearchParams(current);
+    next.delete('search');
+    next.delete('specialty');
+    return next;
+  });
 
   useEffect(() => {
     getDoctors()
@@ -32,18 +56,27 @@ export default function Doctors() {
     <div className="page">
       <PageHeader title="Book an appointment" description="Choose a doctor to see their free times." />
 
-      {/* Same toolbar as the appointment filters; on the right, the specialty last */}
-      <div className="toolbar filters toolbar-end" role="search">
-        <SearchInput label="Search doctors" placeholder="Search by name or specialty" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select value={specialty} onChange={(e) => setSpecialty(e.target.value)} aria-label="Specialty">
-          <option value="">All specialties</option>
-          {specialties.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
+      {doctors?.length !== 0 && (
+        <FilterToolbar
+          searchLabel="Search doctors"
+          placeholder="Search by name or specialty"
+          search={search}
+          onSearch={onSearch}
+          activeFilters={specialty ? 1 : 0}
+          onClearFilters={() => setParam('specialty', '')}
+        >
+          <Field label="Specialty">
+            <select value={specialty} onChange={(e) => setParam('specialty', e.target.value)}>
+              <option value="">All specialties</option>
+              {specialties.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </FilterToolbar>
+      )}
 
       <Alert type="error">{error}</Alert>
       {!doctors && !error && <Muted>Loading doctors…</Muted>}
@@ -58,13 +91,7 @@ export default function Doctors() {
             </>
           }
           action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSearch('');
-                setSpecialty('');
-              }}
-            >
+            <Button variant="secondary" onClick={clearAll}>
               Clear filters
             </Button>
           }

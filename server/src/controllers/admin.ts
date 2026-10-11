@@ -12,6 +12,7 @@ import { toAppointmentJson, toDoctorJson } from '../serializers.js'
 import { listAppointments } from '../services/appointmentList.js'
 import { APPOINTMENT_NOT_FOUND, cancelUpcoming, notifyCancellationInBackground, upcomingWhere } from '../services/appointments.js'
 import { deactivateDoctor } from '../services/doctors.js'
+import { canonicalSpecialty, listSpecialties } from '../services/specialties.js'
 import { createStaffAppointment } from '../services/staffAppointments.js'
 import { escapeLike } from '../utils/search.js'
 
@@ -81,7 +82,14 @@ export const updateDoctor: RequestHandler = async (req, res) => {
   }
 
   const { name, specialty, bio } = parse(doctorDetailsSchema, req.body)
-  res.json(toDoctorJson(await prisma.user.update({ where: { id: doctor.id }, data: { name, specialty, bio } })))
+  const data = { name, specialty: await canonicalSpecialty(specialty, doctor.id), bio } // "cardiology" → "Cardiology"
+  res.json(toDoctorJson(await prisma.user.update({ where: { id: doctor.id }, data })))
+}
+
+// GET /api/admin/specialties — the specialties doctors and pending invitations
+// already have, each once, alphabetically: suggestions for Invite and Edit.
+export const getSpecialties: RequestHandler = async (_req, res) => {
+  res.json(await listSpecialties())
 }
 
 // ---------- appointments ----------

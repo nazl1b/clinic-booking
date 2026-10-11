@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '../api/client';
 import type { Appointment, AppointmentQuery, Page } from '../types';
+import { plural } from '../utils/text';
 import { toAppointmentQuery, useAppointmentFilters } from './useAppointmentFilters';
 
 // Must be a stable function (a module-level API function), not an inline arrow.
@@ -18,6 +19,9 @@ export function useAppointmentList(fetchPage: FetchPage) {
   const listKey = `${JSON.stringify(toAppointmentQuery(filters))}|${reloadKey}`;
   const [list, setList] = useState<{ key: string; page: Page<Appointment> } | null>(null);
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
+  // The default view (active, from today on) can be empty while past or cancelled
+  // appointments exist, so an empty default view asks once more without any filter.
+  const [nothingAtAll, setNothingAtAll] = useState<{ key: string; value: boolean } | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -28,19 +32,32 @@ export function useAppointmentList(fetchPage: FetchPage) {
         const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize));
         if (filters.page > lastPage) update({ page: lastPage }, { replace: true });
         else setList({ key: listKey, page: result });
+        if (result.total === 0 && !isFiltered) {
+          fetchPage({ pageSize: 1 })
+            .then((all) => !ignore && setNothingAtAll({ key: listKey, value: all.total === 0 }))
+            .catch(() => {}); // unknown: the search and filters stay
+        }
       })
       .catch((err) => !ignore && setError({ key: listKey, message: getErrorMessage(err) }));
     return () => {
       ignore = true;
     };
-  }, [fetchPage, filters, update, listKey]);
+  }, [fetchPage, filters, update, listKey, isFiltered]);
+
+  // "32 appointments from today on" / "3 appointments match these filters", for the
+  // toolbar. Empty while loading or when the list is empty (its EmptyState says it).
+  const page = list?.page ?? null;
+  const summary =
+    page && page.items.length > 0 ? `${plural(page.total, 'appointment')}${isFiltered ? ` ${page.total === 1 ? 'matches' : 'match'} these filters` : ' from today on'}` : '';
 
   return {
     filters,
     update,
     clear,
     isFiltered,
-    page: list?.page ?? null,
+    page,
+    summary,
+    isEmpty: nothingAtAll?.key === listKey && nothingAtAll.value, // no appointments at all: no search or filters to show
     busy: list?.key !== listKey,
     error: error?.key === listKey ? error.message : '', // only the current request's error
     reload: () => setReloadKey((k) => k + 1),

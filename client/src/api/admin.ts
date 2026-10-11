@@ -43,6 +43,12 @@ export function cancelInvitation(id: number): Promise<void> {
   return request('DELETE', `/admin/invitations/${id}`);
 }
 
+// GET /api/admin/specialties — the specialties doctors and pending invitations
+// already have, each once, alphabetically (suggestions for Invite and Edit).
+export function getSpecialties(): Promise<string[]> {
+  return request('GET', '/admin/specialties');
+}
+
 // GET /api/admin/doctors/:id/upcoming-count — upcoming appointments (blocks not counted).
 export async function getUpcomingCount(doctorId: number): Promise<number> {
   const { count } = await request<{ count: number }>('GET', `/admin/doctors/${doctorId}/upcoming-count`);

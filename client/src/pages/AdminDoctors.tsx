@@ -1,43 +1,47 @@
-import { Fragment, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   cancelInvitation,
   deactivateDoctor,
   getDoctorsPage,
   getInvitations,
   getUpcomingCount,
-  inviteDoctor,
   reactivateDoctor,
   resendInvitation,
   updateDoctor,
 } from '../api/admin';
 import { getErrorMessage } from '../api/client';
-import { ListToolbar } from '../components/ListToolbar';
+import { FilterToolbar } from '../components/FilterToolbar';
+import { SpecialtyInput } from '../components/SpecialtyInput';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { Button, ButtonLink } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { CharacterCount } from '../components/ui/CharacterCount';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Field, FormActions, FormRow } from '../components/ui/Field';
+import { Field } from '../components/ui/Field';
 import { Muted, PageHeader } from '../components/ui/PageHeader';
 import { Pagination } from '../components/ui/Pagination';
 import { ActionsCell, Table } from '../components/ui/Table';
 import { useConfirm } from '../hooks/useConfirm';
-import { useFieldErrors } from '../hooks/useFieldErrors';
 import { type ListFilters, usePagedList } from '../hooks/usePagedList';
+import { useSpecialties } from '../hooks/useSpecialties';
 import { useToast } from '../hooks/useToast';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import type { DeactivationResult, Doctor, Invitation } from '../types';
 import { formatDate, formatTimestamp } from '../utils/dates';
-import { BIO_MAX_LENGTH, INVITATION_HOURS, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
+import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, SPECIALTY_MAX_LENGTH } from '../utils/limits';
 import { plural } from '../utils/text';
-import { checkEmail, required } from '../utils/validation';
+import type { InviteDoctorState } from './InviteDoctor';
 
 // Both lists are searched and paged by the server; their search, filter and page
 // are in the URL (?invitationsSearch=…&invitationsPage=2&doctorsSearch=…&doctorsStatus=active&doctorsPage=3).
 const INVITATION_FILTERS = ['search'] as const;
 const DOCTOR_FILTERS = ['search', 'status'] as const;
 const INVITATIONS_PAGE_SIZE = 10; // a shorter list above the doctors
+
+// Loaded, nothing in it and no search or filter: only its EmptyState is shown.
+const isEmptyList = (list: { page: { total: number } | null; isFiltered: boolean }) => list.page !== null && list.page.total === 0 && !list.isFiltered;
 
 async function fetchInvitations(filters: ListFilters<'search'>, page: number) {
   const result = await getInvitations({ search: filters.search || undefined, page, pageSize: INVITATIONS_PAGE_SIZE });
@@ -57,14 +61,10 @@ export default function AdminDoctors() {
   const doctorList = usePagedList('doctors', DOCTOR_FILTERS, fetchDoctors);
   const [busyId, setBusyId] = useState<string | null>(null); // e.g. "invite-3", "doctor-2"
 
-  // Invite form
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteName, setInviteName] = useState('');
-  const [inviteSpecialty, setInviteSpecialty] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviting, setInviting] = useState(false);
-  const [inviteError, setInviteError] = useState('');
-  const { errors: inviteErrors, validate: validateInvite } = useFieldErrors<'name' | 'specialty' | 'email'>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [specialtiesKey, setSpecialtiesKey] = useState(0); // reloads the suggestions after a save
+  const specialties = useSpecialties(specialtiesKey);
 
   // Inline edit
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -73,12 +73,16 @@ export default function AdminDoctors() {
   const [editBio, setEditBio] = useState('');
   const [editStart, setEditStart] = useState({ name: '', specialty: '', bio: '' }); // the values when editing began
 
-  // Unsaved changes in the invite form or the doctor being edited: leaving the page asks first.
-  useUnsavedChanges(showInvite && [inviteName, inviteSpecialty, inviteEmail].some((v) => v.trim() !== ''));
+  // Unsaved changes in the doctor being edited: leaving the page asks first.
   useUnsavedChanges(editingId !== null && (editName !== editStart.name || editSpecialty !== editStart.specialty || editBio !== editStart.bio));
 
   // Deactivation: phone appointments the admin has to call (shown until closed)
   const [deactivationResult, setDeactivationResult] = useState<(DeactivationResult & { doctorName: string }) | null>(null);
+
+  const { update: updateInvitations } = invitationList;
+  const { update: updateDoctors } = doctorList;
+  const searchInvitations = useCallback((search: string) => updateInvitations({ search }, { replace: true }), [updateInvitations]);
+  const searchDoctors = useCallback((search: string) => updateDoctors({ search }, { replace: true }), [updateDoctors]);
 
   // After an action: both lists, since e.g. an accepted invitation becomes a doctor.
   function load() {
@@ -103,29 +107,10 @@ export default function AdminDoctors() {
     }
   }
 
-  async function handleInvite(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setInviteError('');
-    const valid = validateInvite(e.currentTarget, {
-      name: required(inviteName, "Please enter the doctor's name."),
-      specialty: required(inviteSpecialty, 'Please enter the specialty.'),
-      email: checkEmail(inviteEmail),
-    });
-    if (!valid) return;
-    setInviting(true);
-    try {
-      const invitation = await inviteDoctor({ name: inviteName, specialty: inviteSpecialty, email: inviteEmail });
-      toast.success(`Invitation sent to ${invitation.email}. The link is valid for ${plural(INVITATION_HOURS, 'hour')}.`);
-      setInviteName('');
-      setInviteSpecialty('');
-      setInviteEmail('');
-      setShowInvite(false);
-      load();
-    } catch (err) {
-      setInviteError(getErrorMessage(err));
-    } finally {
-      setInviting(false);
-    }
+  // The invite form has its own page; it comes back to this list afterwards.
+  function openInvite() {
+    const state: InviteDoctorState = { from: location.pathname + location.search };
+    navigate('/admin/doctors/invite', { state });
   }
 
   function startEdit(doctor: Doctor) {
@@ -138,7 +123,10 @@ export default function AdminDoctors() {
 
   async function saveEdit(doctorId: number) {
     const saved = await run(`doctor-${doctorId}`, () => updateDoctor(doctorId, { name: editName, specialty: editSpecialty, bio: editBio }), 'Doctor details saved.');
-    if (saved) setEditingId(null);
+    if (saved) {
+      setEditingId(null);
+      setSpecialtiesKey((k) => k + 1);
+    }
   }
 
   // First how many upcoming appointments would be cancelled, then the confirm dialog.
@@ -207,7 +195,7 @@ export default function AdminDoctors() {
       <PageHeader
         title="Doctors"
         description="Invite doctors, edit their details or deactivate them."
-        actions={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite doctor</Button>}
+        actions={<Button onClick={openInvite}>Invite doctor</Button>}
       />
       {deactivationResult && (
         <Card
@@ -240,40 +228,19 @@ export default function AdminDoctors() {
         </Card>
       )}
 
-      {showInvite && (
-        <Card title="Invite a doctor" description="The doctor gets an email with a link to set their own password. You never see or set it." onSubmit={handleInvite}>
-          <FormRow>
-            <Field label="Name" error={inviteErrors.name}>
-              <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} required placeholder="Dr. …" maxLength={NAME_MAX_LENGTH} autoFocus />
-            </Field>
-            <Field label="Specialty" error={inviteErrors.specialty}>
-              <input value={inviteSpecialty} onChange={(e) => setInviteSpecialty(e.target.value)} required maxLength={SPECIALTY_MAX_LENGTH} />
-            </Field>
-            <Field label="Email" error={inviteErrors.email}>
-              <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
-            </Field>
-          </FormRow>
-          <Alert type="error">{inviteError}</Alert>
-          <FormActions>
-            <Button type="submit" disabled={inviting}>
-              {inviting ? 'Sending…' : 'Send invitation'}
-            </Button>
-            <Button variant="tertiary" onClick={() => setShowInvite(false)}>
-              Cancel
-            </Button>
-          </FormActions>
-        </Card>
-      )}
-
-      <Card title="Pending invitations">
-        <ListToolbar
-          searchLabel="Search invitations"
-          placeholder="Search name, specialty or email"
-          search={invitationList.filters.search}
-          onChange={invitationList.update}
-          isFiltered={invitationList.isFiltered}
-          onClear={invitationList.clear}
-        />
+      <Card
+        title="Pending invitations"
+        actions={
+          !isEmptyList(invitationList) && (
+            <FilterToolbar
+              searchLabel="Search invitations"
+              placeholder="Search name, specialty or email"
+              search={invitationList.filters.search}
+              onSearch={searchInvitations}
+            />
+          )
+        }
+      >
         <Alert type="error">{invitationList.error}</Alert>
         {invitationList.error ? null : !invitationList.page ? (
           <Muted>Loading…</Muted>
@@ -314,7 +281,7 @@ export default function AdminDoctors() {
                           Resend
                         </Button>
                         <Button
-                          variant="tertiary"
+                          variant="secondary"
                           size="sm"
                           danger
                           disabled={busy}
@@ -333,21 +300,29 @@ export default function AdminDoctors() {
         )}
       </Card>
 
-      <Card title="All doctors">
-        <ListToolbar
-          searchLabel="Search doctors"
-          placeholder="Search name, specialty or email"
-          search={doctorList.filters.search}
-          onChange={doctorList.update}
-          isFiltered={doctorList.isFiltered}
-          onClear={doctorList.clear}
-        >
-          <select value={doctorList.filters.status} onChange={(e) => doctorList.update({ status: e.target.value })} aria-label="Status">
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="deactivated">Deactivated</option>
-          </select>
-        </ListToolbar>
+      <Card
+        title="All doctors"
+        actions={
+          !isEmptyList(doctorList) && (
+            <FilterToolbar
+              searchLabel="Search doctors"
+              placeholder="Search name, specialty or email"
+              search={doctorList.filters.search}
+              onSearch={searchDoctors}
+              activeFilters={doctorList.filters.status ? 1 : 0}
+              onClearFilters={() => doctorList.update({ status: '' })}
+            >
+              <Field label="Status">
+                <select value={doctorList.filters.status} onChange={(e) => doctorList.update({ status: e.target.value })}>
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="deactivated">Deactivated</option>
+                </select>
+              </Field>
+            </FilterToolbar>
+          )
+        }
+      >
         <Alert type="error">{doctorList.error}</Alert>
         {doctorList.error ? null : !doctorList.page ? (
           <Muted>Loading…</Muted>
@@ -370,7 +345,7 @@ export default function AdminDoctors() {
                   icon="users"
                   title="No doctors yet"
                   text="Invite a doctor to get started."
-                  action={!showInvite && <Button onClick={() => setShowInvite(true)}>Invite a doctor</Button>}
+                  action={<Button onClick={openInvite}>Invite a doctor</Button>}
                 />
               )
             ) : (
@@ -382,8 +357,16 @@ export default function AdminDoctors() {
                   return (
                     <Fragment key={doctor.id}>
                       <tr className={rowClass}>
-                        <td>{editing ? <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" /> : doctor.name}</td>
-                        <td>{editing ? <input value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
+                        <td>
+                          {editing ? (
+                            <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={NAME_MAX_LENGTH} aria-label="Name" />
+                          ) : (
+                            <ButtonLink to={`/doctors/${doctor.id}`} variant="tertiary">
+                              {doctor.name}
+                            </ButtonLink>
+                          )}
+                        </td>
+                        <td>{editing ? <SpecialtyInput value={editSpecialty} onChange={setEditSpecialty} suggestions={specialties} maxLength={SPECIALTY_MAX_LENGTH} aria-label="Specialty" /> : doctor.specialty}</td>
                         <td>{doctor.email}</td>
                         <td>
                           <Badge tone={doctor.isActive ? 'primary' : 'neutral'}>{doctor.isActive ? 'Active' : 'Deactivated'}</Badge>
@@ -394,7 +377,7 @@ export default function AdminDoctors() {
                               <Button size="sm" disabled={busy} onClick={() => saveEdit(doctor.id)}>
                                 Save
                               </Button>
-                              <Button variant="tertiary" size="sm" onClick={() => setEditingId(null)}>
+                              <Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>
                                 Cancel
                               </Button>
                             </>
@@ -404,12 +387,12 @@ export default function AdminDoctors() {
                                 Edit
                               </Button>
                               {doctor.isActive ? (
-                                <Button variant="tertiary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
+                                <Button variant="secondary" size="sm" danger disabled={busy} onClick={() => askDeactivate(doctor)}>
                                   Deactivate
                                 </Button>
                               ) : (
                                 <Button
-                                  variant="tertiary"
+                                  variant="secondary"
                                   size="sm"
                                   disabled={busy}
                                   onClick={() => run(`doctor-${doctor.id}`, () => reactivateDoctor(doctor.id), `${doctor.name} is active again.`)}

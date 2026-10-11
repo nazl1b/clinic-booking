@@ -17,7 +17,7 @@ import type { Doctor } from '../types';
 import type { NewStaffAppointmentState } from './NewStaffAppointment';
 
 export default function AdminAppointments() {
-  const { filters, update, clear, isFiltered, page, busy, error: loadError, reload } = useAppointmentList(getAllAppointments);
+  const { filters, update, clear, isFiltered, page, summary, isEmpty, busy, error: loadError, reload } = useAppointmentList(getAllAppointments);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorsError, setDoctorsError] = useState(''); // only the doctor filter needs the list
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export default function AdminAppointments() {
       />
 
       <Card>
-        <AppointmentFilters filters={filters} onChange={update} onClear={clear} isFiltered={isFiltered} doctors={doctors} />
+        {!isEmpty && <AppointmentFilters filters={filters} onChange={update} summary={loadError ? '' : summary} doctors={doctors} />}
 
         <Alert type="error">{loadError}</Alert>
         <Alert type="error">{doctorsError && `Could not load the list of doctors: ${doctorsError}`}</Alert>

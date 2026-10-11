@@ -1,8 +1,8 @@
-// Result of an appointment search: how many match, one page of the table and
-// the page buttons. Shared by the doctor's and the admin's Appointments pages.
+// Result of an appointment search: one page of the table and the page buttons
+// (how many match is in the toolbar above, from useAppointmentList).
+// Shared by the doctor's and the admin's Appointments pages.
 
 import type { Appointment, Page } from '../types';
-import { plural } from '../utils/text';
 import { AppointmentTable } from './AppointmentTable';
 import { Button } from './ui/Button';
 import { EmptyState } from './ui/EmptyState';
@@ -25,12 +25,6 @@ export function AppointmentResults({ page, busy, isFiltered, onClear, showDoctor
 
   return (
     <div className={`results${busy ? ' results-busy' : ''}`} aria-busy={busy}>
-      {page.items.length > 0 && (
-        <Muted>
-          {plural(page.total, 'appointment')}
-          {isFiltered ? ` ${page.total === 1 ? 'matches' : 'match'} these filters` : ' from today on'}
-        </Muted>
-      )}
       <AppointmentTable
         appointments={page.items}
         showDoctor={showDoctor}

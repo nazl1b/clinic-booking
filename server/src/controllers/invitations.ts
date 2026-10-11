@@ -11,6 +11,7 @@ import { parse, parseId } from '../schemas/validate.js'
 import { sendEmail } from '../services/email.js'
 import { INVITATION_HOURS, invitationEmail } from '../services/emailTemplates.js'
 import { hashPassword } from '../services/passwords.js'
+import { canonicalSpecialty } from '../services/specialties.js'
 import { createToken, hashToken } from '../services/tokens.js'
 import { escapeLike } from '../utils/search.js'
 
@@ -45,7 +46,9 @@ async function emailInvitation(invitation: Invitation, token: string): Promise<v
 // nothing is sent then. Invitations for the same email wait for each other (lock),
 // so two simultaneous requests cannot both create one.
 export const createInvitation: RequestHandler = async (req, res) => {
-  const { name, specialty, email } = parse(invitationSchema, req.body)
+  const input = parse(invitationSchema, req.body)
+  const { name, email } = input
+  const specialty = await canonicalSpecialty(input.specialty) // "cardiology" → "Cardiology"
   const { token, tokenHash } = createToken()
 
   const invitation = await prisma.$transaction(async (tx) => {

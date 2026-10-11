@@ -288,7 +288,7 @@ export default function Availability() {
                                   aria-invalid={rowError?.end || undefined}
                                   aria-describedby={rowError ? errorId : undefined}
                                 />
-                                <Button variant="tertiary" size="sm" danger onClick={() => removeRule(index)}>
+                                <Button variant="secondary" size="sm" danger onClick={() => removeRule(index)}>
                                   Remove
                                 </Button>
                               </div>

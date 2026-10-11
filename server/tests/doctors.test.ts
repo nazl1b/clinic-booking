@@ -39,9 +39,15 @@ describe('doctor profile page', () => {
     }
   })
 
-  it('is for patients only', async () => {
-    const doctor = await createUser({ role: 'doctor' })
-    expect((await admin.get(`/api/doctors/${doctor.id}`)).status).toBe(403)
+  it('admins see any doctor, deactivated ones too; other doctors may not', async () => {
+    const inactive = await createUser({ role: 'doctor', isActive: false })
+    const res = await admin.get(`/api/doctors/${inactive.id}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ id: inactive.id, isActive: false })
+    expect((await admin.get('/api/doctors/999999')).status).toBe(404)
+
+    const doctor = await loginAs((await createUser({ role: 'doctor' })).email)
+    expect((await doctor.get(`/api/doctors/${inactive.id}`)).status).toBe(403)
   })
 })
 

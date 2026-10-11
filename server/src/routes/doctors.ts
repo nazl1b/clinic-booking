@@ -8,5 +8,5 @@ export const doctorsRouter = Router()
 doctorsRouter.use(requireLogin)
 
 doctorsRouter.get('/', requireRole('patient'), listDoctors)
-doctorsRouter.get('/:id', requireRole('patient'), getDoctor)
+doctorsRouter.get('/:id', requireRole('patient', 'admin'), getDoctor)
 doctorsRouter.get('/:id/slots', getDoctorSlots)

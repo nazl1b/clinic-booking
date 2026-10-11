@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   cancelAnyAppointment,
   createAdminAppointment,
+  getSpecialties,
   getUpcomingCount,
   listAllAppointments,
   listAllDoctors,
@@ -18,6 +19,7 @@ adminRouter.use(requireLogin, requireRole('admin'))
 adminRouter.get('/doctors', listAllDoctors)
 adminRouter.get('/doctors/:id/upcoming-count', getUpcomingCount)
 adminRouter.patch('/doctors/:id', updateDoctor)
+adminRouter.get('/specialties', getSpecialties)
 
 adminRouter.post('/invitations', createInvitation)
 adminRouter.get('/invitations', listInvitations)

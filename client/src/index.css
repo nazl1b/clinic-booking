@@ -65,6 +65,7 @@
   --content-pad-top: 28px;
   --content-pad-bottom: 48px;
   --page-gap: 20px; /* between header, cards and grids */
+  --search-width: 320px; /* every list's search box: the longest placeholder ("Search patient name, phone or email") fits whole */
   --topbar-height: 56px;
   --control-height: 38px;
 
@@ -530,7 +531,8 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .user-menu-panel {
+  .user-menu-panel,
+  .filter-panel {
     animation: none;
   }
   .user-menu-chevron,
@@ -768,6 +770,15 @@ h1.card-title {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+@media (max-width: 600px) {
+  .card-actions:has(.filter-toolbar) {
+    flex-basis: 100%;
+  }
+  .card-actions .filter-toolbar {
+    flex: 1;
+    min-width: 0;
+  }
 }
 .card-footer {
   font-size: 0.93rem;
@@ -1120,27 +1131,81 @@ input::-ms-reveal {
   padding-left: 36px; /* room for the icon */
 }
 
-/* Search and filters above an appointment list */
-.filters {
-  gap: 10px 12px;
+/* Above every list with a search (FilterToolbar): a wide search box and, for lists
+   with filters, a "Filters" button whose popover holds them. */
+/* The list's count (if any) on the left; search and Filters together on the right. */
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
 }
-.filters-search {
-  flex: 1 1 260px;
+.filter-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
   min-width: 0;
 }
-/* A toolbar whose controls sit on the right (Book an appointment: search + specialty) */
-.toolbar-end {
+.filter-toolbar .search-input {
+  flex: 0 1 var(--search-width);
+  width: var(--search-width);
+  min-width: 0;
+}
+.filter-toolbar .search-input input,
+.filter-toolbar .btn {
+  min-height: 38px;
+}
+.filter-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+.filter-menu.open > .btn {
+  background: var(--surface-muted);
+}
+/* Same look as the user menu's dropdown */
+.filter-panel {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 48px); /* inside the page's side padding on a phone */
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+  animation: menu-in var(--ease-fast);
+}
+.filter-panel select,
+.filter-panel input {
+  width: 100%;
+}
+.filter-panel-actions {
+  display: flex;
   justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
-.toolbar-end .search-input {
-  width: 280px;
-}
-.filters .field-inline {
-  gap: 8px;
-}
-.filters .field-label {
-  font-size: 0.87rem;
-  color: var(--text-muted);
+/* Phones: the search gets the whole line (its placeholder stays whole), the
+   Filters button goes under it and its popover opens from the left. */
+@media (max-width: 600px) {
+  .filter-toolbar-controls {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .filter-toolbar .search-input {
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .filter-panel {
+    left: 0;
+    right: auto;
+  }
 }
 
 /* List + its pagination; dimmed while a newer page is loading */
@@ -1177,15 +1242,6 @@ input::-ms-reveal {
   font-size: 0.93rem;
   font-weight: 500;
 }
-@media (max-width: 600px) {
-  .filters > * {
-    flex: 1 1 100%;
-  }
-  .filters .field-inline input {
-    flex: 1;
-  }
-}
-
 /* ================= Toasts and confirm dialog ================= */
 
 /* Both enter by sliding down a little while fading in (ease-out) and leave the

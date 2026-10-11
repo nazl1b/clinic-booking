@@ -18,6 +18,7 @@ import DoctorAppointments from './pages/DoctorAppointments';
 import DoctorProfile from './pages/DoctorProfile';
 import DoctorSchedule from './pages/DoctorSchedule';
 import Doctors from './pages/Doctors';
+import InviteDoctor from './pages/InviteDoctor';
 import ForgotPassword from './pages/ForgotPassword';
 import Login from './pages/Login';
 import MyAppointments from './pages/MyAppointments';
@@ -75,7 +76,7 @@ const router = createBrowserRouter(
 
         {/* Patient */}
         <Route path="doctors" element={<RequireRole roles={['patient']}><Doctors /></RequireRole>} />
-        <Route path="doctors/:id" element={<RequireRole roles={['patient']}><DoctorProfile /></RequireRole>} />
+        <Route path="doctors/:id" element={<RequireRole roles={['patient', 'admin']}><DoctorProfile /></RequireRole>} />
         <Route path="doctors/:id/book" element={<RequireRole roles={['patient']}><BookSlot /></RequireRole>} />
         <Route path="appointments" element={<RequireRole roles={['patient']}><MyAppointments /></RequireRole>} />
 
@@ -87,6 +88,7 @@ const router = createBrowserRouter(
 
         {/* Admin */}
         <Route path="admin/doctors" element={<RequireRole roles={['admin']}><AdminDoctors /></RequireRole>} />
+        <Route path="admin/doctors/invite" element={<RequireRole roles={['admin']}><InviteDoctor /></RequireRole>} />
         <Route path="admin/appointments" element={<RequireRole roles={['admin']}><AdminAppointments /></RequireRole>} />
         <Route path="admin/appointments/new" element={<RequireRole roles={['admin']}><NewStaffAppointment /></RequireRole>} />
       </Route>

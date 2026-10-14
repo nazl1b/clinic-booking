@@ -2,9 +2,9 @@
 
 A web app for a medical clinic: patients book appointments online, doctors manage their schedule, and an admin manages the doctors.
 
-**Live demo: https://clinic-booking-w0l4.onrender.com**
+**Live demo: https://clinic-booking-w0l4.onrender.com** (hosted on Render's free plan: the first load can take up to a minute while the server wakes up)
 
-> Demo project with fake data. No medical information is stored.
+> Demo project with fake data. No medical information is stored. A notice at the top of every page says so too.
 
 ## Try it
 
@@ -13,9 +13,9 @@ A web app for a medical clinic: patients book appointments online, doctors manag
 | Patient | `john@example.com` | `password123` |
 | Doctor | `maria@clinic.test` | `password123` |
 
-You can also register your own patient account.
+The login page has a "Try a demo account" box that fills these in for you. You can also register your own patient account.
 
-- The first page load can take about a minute: on Render's free plan the server sleeps after 15 minutes without visitors.
+- The server sleeps after 15 minutes without visitors, which is why the first load is slow.
 - The demo accounts are shared, so their password cannot be changed or reset. They use addresses that cannot receive mail, so no emails are sent to them.
 - The admin account is not public.
 
@@ -23,32 +23,42 @@ You can also register your own patient account.
 
 | | |
 |---|---|
-| ![Booking: free times for each day of the week](docs/screenshots/booking.png) | ![A patient's appointments](docs/screenshots/my-appointments.png) |
-| **Booking:** free times for each day of the week | **Patient:** upcoming appointments and history |
-| ![Doctor's day: appointments, free times and blocked time](docs/screenshots/doctor-schedule.png) | ![Weekly working hours](docs/screenshots/working-hours.png) |
-| **Doctor:** the whole day, with free times and blocked time | **Doctor:** weekly working hours |
-| ![Admin: doctors and invitations](docs/screenshots/admin-doctors.png) | ![The app on a phone](docs/screenshots/mobile.png) |
-| **Admin:** doctors and invitations | **On a phone** |
+| ![Booking: free times for each day of the week, with a reason for the visit](docs/screenshots/booking.png) | ![A patient's upcoming appointments](docs/screenshots/my-appointments.png) |
+| **Booking:** free times for each day of the week, with a reason for the visit | **Patient:** upcoming appointments, with the reason and note of each |
+| ![Doctor's day: appointments and blocked time, with a 7-day strip](docs/screenshots/doctor-schedule.png) | ![Weekly working hours](docs/screenshots/working-hours.png) |
+| **Doctor:** the day's appointments and blocked time, with a 7-day strip | **Doctor:** weekly working hours |
+| ![Admin: doctors and invitations](docs/screenshots/admin-doctors.png) | ![The doctors list on a phone](docs/screenshots/mobile.png) |
+| **Admin:** doctors and invitations, with search and filters | **On a phone:** choosing a doctor |
 
 ## Features
 
 **Patients**
 - Register, log in, reset a forgotten password by email, change the password
-- See a doctor's free times for each day of the week and book one
+- Browse the doctors with a search and a specialty filter, and read each doctor's profile page (specialty and bio)
+- See a doctor's free times for each day of the week and book one, with a reason for the visit (first visit, follow-up, check-up, test results, other) and an optional note
 - See and cancel their own upcoming appointments
 - Get an email reminder the day before, and an email if the clinic cancels
 
 **Doctors**
 - Join by email invitation and choose their own password (nobody else ever knows it)
-- Set weekly working hours: several periods per day, one appointment length per day
-- See their day with appointments, free times and blocked time
-- Add phone bookings for patients without an account, and block time (e.g. a break)
+- Write a short bio that patients see on their profile page
+- Set weekly working hours: several periods per day, one appointment length per day, "Copy to all weekdays"
+- See their day with its appointments and blocked time, and a 7-day strip with how many appointments each day has
+- Add phone bookings for patients without an account (with a reason for the visit), and block time (e.g. a break)
 - Search, filter and page through all their appointments; cancel any upcoming one
 
 **Admin**
-- Invite doctors, resend or cancel invitations, edit doctors' details
+- Invite doctors, resend or cancel invitations, edit doctors' details and bio, open a doctor's profile page
+- Choose a doctor's specialty from the existing ones or type a new one ("cardiology" is saved as the existing "Cardiology")
+- Search, filter and page through doctors and invitations
 - Deactivate a doctor: they are logged out at once, their upcoming appointments are cancelled, online patients are emailed, and the admin gets a list of phone bookings to call
 - See every appointment of the clinic with search, filters and pages; add phone bookings or block time for any doctor; cancel any upcoming appointment
+
+**Everywhere**
+- Short messages (toasts) after an action, and a confirm dialog before anything that cannot be undone (cancelling, deactivating…)
+- A warning before leaving a form with unsaved changes
+- Search, filters and page are kept in the URL, so a refresh or the Back button shows the same list
+- Light and dark mode, and a layout that works on phones
 
 ## Tech stack
 
@@ -98,7 +108,8 @@ clinic-booking/
 │       ├── pages/          one component per page
 │       ├── components/     shared UI
 │       ├── api/            functions that call the backend
-│       └── context/        who is logged in
+│       ├── hooks/          shared logic (lists, filters, unsaved changes…)
+│       └── context/        app-wide state: who is logged in, toasts, confirm dialog
 ├── server/                 Express API
 │   ├── prisma/             schema, migrations, seed
 │   ├── src/
@@ -175,7 +186,7 @@ npm test
 
 The migrations are applied to the test branch first. The tests refuse to run if `.env.test` is missing or points to the same database as `.env`. No emails are sent: the tests read the links from an in-memory inbox.
 
-They cover login and roles, passwords (reset links, logging out other sessions), invitations, booking (double bookings, simultaneous bookings, times outside the working hours, overlaps after the appointment length changes, phone bookings closing a time for online booking), who may see which free times, and the paginated appointment lists.
+They cover login and roles, passwords (reset links, logging out other sessions), invitations, booking (double bookings, simultaneous bookings, times outside the working hours, overlaps after the appointment length changes, phone bookings closing a time for online booking), the reason for the visit, working hours that overlap, doctor profiles and bios, specialties, who may see which free times, and the paginated lists of appointments, doctors and invitations.
 
 ## Deployment
 
@@ -197,12 +208,12 @@ All endpoints start with `/api` and answer JSON. Errors are `{ "error": "message
 |---|---|
 | Anyone | `POST auth/register`, `auth/login`, `auth/logout`, `auth/forgot-password`, `auth/reset-password` · `GET auth/me` · `GET invitations/:token`, `POST invitations/:token/accept` |
 | Logged in | `PATCH auth/password` · `GET doctors/:id/slots?date=` |
-| Patient | `GET doctors` · `POST appointments` · `GET appointments/mine?view=upcoming|past` · `PATCH appointments/:id/cancel` |
-| Doctor | `GET`/`PUT doctor/availability` · `GET doctor/appointments` · `POST doctor/appointments` · `PATCH doctor/appointments/:id/cancel` |
-| Admin | `GET admin/doctors` · `GET admin/doctors/:id/upcoming-count` · `PATCH admin/doctors/:id` · `POST`/`GET admin/invitations` · `POST admin/invitations/:id/resend` · `DELETE admin/invitations/:id` · `GET`/`POST admin/appointments` · `PATCH admin/appointments/:id/cancel` |
+| Patient | `GET doctors` · `GET doctors/:id` · `POST appointments` · `GET appointments/mine?view=upcoming|past` · `PATCH appointments/:id/cancel` |
+| Doctor | `GET`/`PUT doctor/availability` · `PATCH doctor/profile` (bio) · `GET doctor/appointments` · `POST doctor/appointments` · `PATCH doctor/appointments/:id/cancel` |
+| Admin | `GET doctors/:id` (deactivated doctors too) · `GET admin/doctors` · `GET admin/doctors/:id/upcoming-count` · `PATCH admin/doctors/:id` · `GET admin/specialties` · `POST`/`GET admin/invitations` · `POST admin/invitations/:id/resend` · `DELETE admin/invitations/:id` · `GET`/`POST admin/appointments` · `PATCH admin/appointments/:id/cancel` |
 | Cron | `POST cron/reminders` (secret key) |
 
-The doctor's and admin's appointment lists take `page` (20 per page), `search` (patient name, email or phone), `status`, `kind`, `from`, `to`, and for the admin `doctor`. The patient's `appointments/mine` takes `view` (`upcoming`, or `past` for past and cancelled) and `page` (10 per page). All of them answer `{ items, page, pageSize, total }`.
+The doctor's and admin's appointment lists take `page` (20 per page), `search` (patient name, email or phone), `status`, `kind`, `from`, `to`, and for the admin `doctor`. The patient's `appointments/mine` takes `view` (`upcoming`, or `past` for past and cancelled) and `page` (10 per page). The admin's `admin/doctors` takes `search`, `status` (`active` or `deactivated`) and `page`; `admin/invitations` takes `search` and `page`. All of them answer `{ items, page, pageSize, total }`. Booking and phone appointments require a `reason` (`first_visit`, `follow_up`, `check_up`, `test_results`, `other`).
 
 ## Not included yet
 

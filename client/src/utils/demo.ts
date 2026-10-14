@@ -5,6 +5,9 @@
 
 import type { Role } from '../types';
 
+// Shown at the top of every page (DemoBanner).
+export const DEMO_NOTICE = "Demo project — not a real clinic. Please don't enter real personal data.";
+
 export interface DemoAccount {
   role: Role;
   email: string;

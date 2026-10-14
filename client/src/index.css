@@ -66,6 +66,7 @@
   --content-pad-bottom: 48px;
   --page-gap: 20px; /* between header, cards and grids */
   --search-width: 320px; /* every list's search box: the longest placeholder ("Search patient name, phone or email") fits whole */
+  --banner-height: 28px; /* DemoBanner; 2 lines on narrow screens (see below) */
   --topbar-height: 56px;
   --control-height: 38px;
 
@@ -207,19 +208,46 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
+/* ================= Demo notice (DemoBanner) ================= */
+
+/* A thin line at the very top of every page, always in view. Above the top bar,
+   the mobile menu and popovers; under dialogs and toasts. */
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--banner-height);
+  padding: 0 16px;
+  background: var(--primary-soft);
+  border-bottom: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  text-align: center;
+}
+/* Narrow screens (the text is about 410px wide): it takes two lines */
+@media (max-width: 440px) {
+  :root {
+    --banner-height: 40px;
+  }
+}
+
 /* ================= App layout: sidebar + top bar ================= */
 
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--banner-height));
 }
 
 .sidebar {
   position: sticky;
-  top: 0;
+  top: var(--banner-height);
   flex: 0 0 var(--sidebar-width);
   width: var(--sidebar-width);
-  height: 100vh;
+  height: calc(100vh - var(--banner-height));
   overflow-y: auto;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
@@ -341,7 +369,7 @@ code {
 
 .topbar {
   position: sticky;
-  top: 0;
+  top: var(--banner-height);
   z-index: 10;
   display: flex;
   align-items: center;
@@ -620,7 +648,7 @@ code {
     position: fixed;
     z-index: 30;
     left: 0;
-    top: 0;
+    top: var(--banner-height);
     bottom: 0;
     height: auto;
     box-shadow: 0 0 24px rgb(0 0 0 / 20%);
@@ -635,7 +663,7 @@ code {
   .menu-open .sidebar-backdrop {
     display: block;
     position: fixed;
-    inset: 0;
+    inset: var(--banner-height) 0 0;
     z-index: 20;
     background: var(--backdrop);
   }
@@ -665,7 +693,7 @@ code {
 
 .auth-shell {
   position: relative;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--banner-height));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -736,7 +764,7 @@ code {
   min-width: 0;
 }
 .card[id] {
-  scroll-margin-top: calc(var(--topbar-height) + var(--page-gap)); /* not hidden under the sticky top bar */
+  scroll-margin-top: calc(var(--banner-height) + var(--topbar-height) + var(--page-gap)); /* not hidden under the banner and the sticky top bar */
 }
 .card-danger {
   border-color: var(--danger-line);
@@ -1273,7 +1301,7 @@ input::-ms-reveal {
 .toast-region {
   position: fixed;
   z-index: 60;
-  top: 16px;
+  top: calc(var(--banner-height) + 16px);
   left: 50%;
   transform: translateX(-50%);
   width: min(420px, calc(100vw - 32px));

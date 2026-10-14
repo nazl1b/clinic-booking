@@ -1,6 +1,7 @@
 import { createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
+import { DemoBanner } from './components/layout/DemoBanner';
 import { GuestOnly, RequireRole } from './components/RequireRole';
 import { ButtonLink } from './components/ui/Button';
 import { Card } from './components/ui/Card';
@@ -105,6 +106,7 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
+          <DemoBanner />
           <RouterProvider router={router} />
         </ConfirmProvider>
       </ToastProvider>

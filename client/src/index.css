@@ -55,6 +55,10 @@
   --radius-xs: 4px;
   --shadow-card: 0 1px 2px rgb(16 33 28 / 4%), 0 1px 3px rgb(16 33 28 / 5%); /* very soft, cards stand out from the page */
   --shadow-popover: 0 8px 24px rgb(16 33 28 / 12%), 0 2px 6px rgb(16 33 28 / 8%); /* dropdowns float above the page */
+  /* Buttons (not tertiary links): lift a little on hover, go back down when pressed */
+  --button-lift: translateY(-1px);
+  --button-press: translateY(0);
+  --shadow-button-hover: 0 2px 6px rgb(16 33 28 / 10%), 0 1px 2px rgb(16 33 28 / 6%);
   --focus-ring: 0 0 0 3px rgb(31 79 67 / 22%);
   --hatch-a: #f5f6f5;
   --hatch-b: #ebeeec;
@@ -131,6 +135,7 @@
   --focus-ring: 0 0 0 3px rgb(143 194 173 / 30%);
   --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 30%);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 25%), 0 1px 3px rgb(0 0 0 / 20%);
+  --shadow-button-hover: 0 2px 6px rgb(0 0 0 / 35%), 0 1px 2px rgb(0 0 0 / 25%);
 }
 
 * {
@@ -583,13 +588,11 @@ code {
   cursor: pointer;
   transition:
     background-color var(--ease-fast),
+    box-shadow var(--ease-fast),
     transform var(--ease-fast);
 }
 .icon-button:hover {
   background: var(--surface-muted);
-}
-.icon-button:active {
-  transform: scale(0.95);
 }
 .theme-toggle {
   color: var(--text-muted);
@@ -850,9 +853,25 @@ h1.card-title {
     background-color var(--ease-fast),
     border-color var(--ease-fast),
     color var(--ease-fast),
+    box-shadow var(--ease-fast),
     transform var(--ease-fast);
 }
-.btn:active:not(:disabled) {
+/* Every button but the tertiary links (icon buttons too, see .icon-button):
+   lifts a little with a soft shadow on hover, goes back down when pressed.
+   With reduced motion only the colours change. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn:not(.btn-tertiary):hover:not(:disabled),
+  .icon-button:hover:not(:disabled) {
+    transform: var(--button-lift);
+    box-shadow: var(--shadow-button-hover);
+  }
+  .btn:not(.btn-tertiary):active:not(:disabled),
+  .icon-button:active:not(:disabled) {
+    transform: var(--button-press);
+    box-shadow: none;
+  }
+}
+.btn-tertiary:active:not(:disabled) {
   transform: scale(0.97);
 }
 .btn:disabled {
